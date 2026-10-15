@@ -57,8 +57,10 @@ uv run pytest tests/ -q     # оффлайн: стор + HMAC (aiogram/сеть 
 ```
 
 ## Состояние
-Скелет фазы **Ф0** (layout, контракт-DTO, стор SQLite, ingress-роут/health, каркас тестов). Telegram-логика
-(`start_polling`) и адаптер в rca-chat — фазы Ф1–Ф4 плана (`support-relay-plan.md`). Не развёрнут.
+**Ф0** (скелет) + **Ф1** (ingress + callback): HTTP-контракт `/v1/messages` (HMAC-гейт), `relay.ingress`
+(find-or-create тикет → forum-топик → отправка) и обратный путь оператор→callback (`on_operator_message`/
+`/close` → подписанный POST продукту, fail-soft) покрыты оффлайн-тестами (TelegramOps/httpx замоканы).
+Осталось: Telegram long-polling (`start_polling`, Ф2), адаптер в rca-chat (Ф3), развёртывание (Ф4). Не развёрнут.
 
 ## Происхождение
 Система **ДаЛи** (RCA-диагностика). Разведка рынка решений и обоснование «своего relay» — в rca-stack
