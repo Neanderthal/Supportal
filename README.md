@@ -57,10 +57,14 @@ uv run pytest tests/ -q     # оффлайн: стор + HMAC (aiogram/сеть 
 ```
 
 ## Состояние
-**Ф0** (скелет) + **Ф1** (ingress + callback): HTTP-контракт `/v1/messages` (HMAC-гейт), `relay.ingress`
-(find-or-create тикет → forum-топик → отправка) и обратный путь оператор→callback (`on_operator_message`/
-`/close` → подписанный POST продукту, fail-soft) покрыты оффлайн-тестами (TelegramOps/httpx замоканы).
-Осталось: Telegram long-polling (`start_polling`, Ф2), адаптер в rca-chat (Ф3), развёртывание (Ф4). Не развёрнут.
+**Ф0–Ф2** реализованы и покрыты оффлайн-тестами (15 тестов, ruff чистый):
+- **Ф1** ingress + callback: `/v1/messages` (HMAC-гейт), `relay.ingress` (find-or-create тикет → forum-топик →
+  отправка), обратный путь оператор→callback (`on_operator_message`/`/close` → подписанный POST, fail-soft).
+- **Ф2** Telegram-сторона: `start_polling` (aiogram-хэндлеры топиков супергруппы — `/close`|`/ban`→команда,
+  текст→ответ; фильтр «наша группа + внутри топика», неизвестные `/…` игнорируются), `ensure_topic`/`send_to_topic`.
+
+Осталось: **smoke** на тестовой супергруппе + **IPv6-egress на VM** (Telegram с Timeweb достижим только по IPv6,
+§9 спеки) · адаптер в rca-chat (Ф3) · развёртывание в `compose.cloud.yml` + CD (Ф4). Не развёрнут.
 
 ## Происхождение
 Система **ДаЛи** (RCA-диагностика). Разведка рынка решений и обоснование «своего relay» — в rca-stack
