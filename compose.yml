@@ -1,0 +1,11 @@
+# dali-support — relay «веб-чат ↔ оператор в Telegram».
+# Co-location рядом с rca-stack (та же docker-сеть) либо отдельный хост, доступный продукту по сети.
+services:
+  dali-support:
+    build: .
+    image: dali-support:local
+    container_name: dali-support
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8500:8500"   # ingress от продукта; Telegram — long-polling (egress), inbound-webhook не нужен

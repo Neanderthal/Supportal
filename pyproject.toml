@@ -1,0 +1,33 @@
+[project]
+name = "dali-support"
+version = "0.1.0"
+description = "dali-support: встраиваемый relay «веб-чат пользователя ↔ оператор в Telegram» (forum-топики)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "aiogram>=3.13",     # Telegram Bot API (forum topics, long-polling) — сторона оператора
+    "httpx>=0.27",       # callback продукту (ответ оператора → живая сессия пользователя)
+    "pydantic>=2.8",     # DTO HTTP-контракта (граница встраивания)
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]   # tests/ импортят пакет dali_support из корня репозитория
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# Фиксируем дефолтный набор ruff (E4/E7/E9/F) версия-независимо (как в rca-stack/dali-drawing).
+select = ["E4", "E7", "E9", "F"]
+# Намеренный компактный стиль: E701 `if x: y`, E702 `a; b`, E401 `import a, b`.
+ignore = ["E701", "E702", "E401"]
