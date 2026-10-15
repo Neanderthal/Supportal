@@ -23,7 +23,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     cfg = config or Config.from_env()
     store = Store(cfg.db_url)
     store.bootstrap()
-    tg = TelegramOps(cfg.tg_bot_token, cfg.tg_group_id)
+    tg = TelegramOps(cfg.tg_bot_token, cfg.tg_group_id, proxy=cfg.tg_proxy)
     relay = Relay(store, tg, cfg.product_callback_url, cfg.callback_secret,
                   outbox_ttl=cfg.outbox_ttl, outbox_max_attempts=cfg.outbox_max_attempts,
                   outbox_backoff_base=cfg.outbox_backoff_base, outbox_backoff_cap=cfg.outbox_backoff_cap)

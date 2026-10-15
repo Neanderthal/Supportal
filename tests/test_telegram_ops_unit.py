@@ -22,6 +22,19 @@ def test_operator_name_prefers_username_then_fullname_then_id():
     assert operator_name(None) == ""
 
 
+def test_proxy_builds_session_with_connector():
+    # proxy задан → Bot строится с AiohttpSession поверх forward-proxy (egress к Telegram через внешний хост)
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID, proxy="http://dali:secret@85.234.107.135:48610")
+    from aiogram.client.session.aiohttp import AiohttpSession
+    assert isinstance(tg._bot.session, AiohttpSession)
+    assert getattr(tg._bot.session, "_proxy", None) == "http://dali:secret@85.234.107.135:48610"
+
+
+def test_no_proxy_default_session():
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
+    assert getattr(tg._bot.session, "_proxy", None) in (None, "")
+
+
 def test_start_polling_registers_two_handlers(monkeypatch):
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
     captured = {}

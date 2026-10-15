@@ -29,9 +29,15 @@ def operator_name(user) -> str:
 
 
 class TelegramOps:
-    def __init__(self, bot_token: str, group_id: int) -> None:
+    def __init__(self, bot_token: str, group_id: int, proxy: str = "") -> None:
         from aiogram import Bot, Dispatcher
-        self._bot = Bot(bot_token)
+        # proxy задан → egress к api.telegram.org через forward-proxy (на Timeweb Telegram доступен лишь по
+        # IPv6; HTTP CONNECT-прокси на внешнем хосте с IPv4-egress снимает блокер, см. docs/integration.md §IPv6).
+        if proxy:
+            from aiogram.client.session.aiohttp import AiohttpSession
+            self._bot = Bot(bot_token, session=AiohttpSession(proxy=proxy))
+        else:
+            self._bot = Bot(bot_token)
         self._dp = Dispatcher()
         self._group_id = group_id
 

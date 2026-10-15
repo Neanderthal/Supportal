@@ -24,6 +24,7 @@ class Config:
     # Telegram (сторона оператора)
     tg_bot_token: str          # SUPPORT_TG_BOT_TOKEN — секрет
     tg_group_id: int           # SUPPORT_TG_GROUP_ID — forum-супергруппа поддержки (chat_id, обычно отрицательный)
+    tg_proxy: str              # SUPPORT_TG_PROXY — forward-proxy для egress к Telegram (пусто → напрямую; на Timeweb — через внешний IPv4-хост)
     # HTTP-контракт с продуктом
     product_callback_url: str  # SUPPORT_PRODUCT_CALLBACK_URL — куда POST'ить ответы оператора
     callback_secret: str       # SUPPORT_CALLBACK_SECRET — HMAC relay → продукт
@@ -43,6 +44,7 @@ class Config:
         return Config(
             tg_bot_token=_env("SUPPORT_TG_BOT_TOKEN"),
             tg_group_id=_env_int("SUPPORT_TG_GROUP_ID", 0),
+            tg_proxy=_env("SUPPORT_TG_PROXY"),
             product_callback_url=_env("SUPPORT_PRODUCT_CALLBACK_URL"),
             callback_secret=_env("SUPPORT_CALLBACK_SECRET"),
             ingress_secret=_env("SUPPORT_INGRESS_SECRET"),

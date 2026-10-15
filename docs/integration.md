@@ -29,5 +29,7 @@ Relay не зависит от продукта. Встраивающая сто
 ## Развёртывание рядом с продуктом
 - Co-location: сервис в compose продукта, той же docker-сети. Ingress и callback ходят по внутренним
   именам (`http://dali-support:8500`, `http://<продукт>/…/push`). Публичных маршрутов добавлять не нужно.
-- Telegram — egress long-polling. ⚠️ На облаке Timeweb `api.telegram.org` достижим по IPv6 — обеспечить
-  контейнеру рабочий IPv6-egress (см. спеку §9).
+- Telegram — egress long-polling. ⚠️ На облаке Timeweb `api.telegram.org` достижим **только по IPv6**, а
+  docker-сеть обычно без IPv6. Два пути: (а) включить IPv6-egress контейнеру; (б) **`SUPPORT_TG_PROXY`** —
+  HTTP CONNECT forward-proxy на внешнем хосте с IPv4-egress к Telegram (напр. мониторинг-хост в ЕС).
+  Прокси лочится по IP релея + auth + только CONNECT:443 к `api.telegram.org`. См. спеку §9.

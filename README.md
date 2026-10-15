@@ -48,6 +48,7 @@ Docker: `docker compose up -d` (сервис на :8500).
 |---|---|
 | `SUPPORT_TG_BOT_TOKEN` | токен бота поддержки (@BotFather) |
 | `SUPPORT_TG_GROUP_ID` | chat_id forum-супергруппы (бот — админ с «Управление темами») |
+| `SUPPORT_TG_PROXY` | forward-proxy для egress к Telegram (пусто → напрямую). На Timeweb Telegram доступен лишь по IPv6 → HTTP CONNECT-прокси на внешнем IPv4-хосте; напр. `http://user:pass@host:port` |
 | `SUPPORT_PRODUCT_CALLBACK_URL` | куда POST'ить ответы оператора (адаптер продукта) |
 | `SUPPORT_CALLBACK_SECRET` / `SUPPORT_INGRESS_SECRET` | HMAC обеих связок |
 | `SUPPORT_DB_URL` | хранилище тикетов + outbox (дефолт `sqlite:///./dali_support.db`) |
