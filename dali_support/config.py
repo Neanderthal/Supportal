@@ -31,6 +31,12 @@ class Config:
     # Хранилище и сеть
     db_url: str                # SUPPORT_DB_URL — по умолчанию локальный SQLite
     http_port: int             # SUPPORT_HTTP_PORT
+    # Outbox повторной доставки ответа оператора (продукт вернул delivered=0 / callback упал)
+    outbox_retry_interval: int # SUPPORT_OUTBOX_RETRY_INTERVAL — период фонового повтора, с
+    outbox_ttl: int            # SUPPORT_OUTBOX_TTL — сколько держим неотданный ответ, с (затем сдаёмся)
+    outbox_max_attempts: int   # SUPPORT_OUTBOX_MAX_ATTEMPTS — потолок попыток доставки
+    outbox_backoff_base: int   # SUPPORT_OUTBOX_BACKOFF_BASE — базовая задержка backoff, с
+    outbox_backoff_cap: int    # SUPPORT_OUTBOX_BACKOFF_CAP — потолок задержки backoff, с
 
     @staticmethod
     def from_env() -> "Config":
@@ -42,4 +48,9 @@ class Config:
             ingress_secret=_env("SUPPORT_INGRESS_SECRET"),
             db_url=_env("SUPPORT_DB_URL", "sqlite:///./dali_support.db"),
             http_port=_env_int("SUPPORT_HTTP_PORT", 8500),
+            outbox_retry_interval=_env_int("SUPPORT_OUTBOX_RETRY_INTERVAL", 30),
+            outbox_ttl=_env_int("SUPPORT_OUTBOX_TTL", 86400),
+            outbox_max_attempts=_env_int("SUPPORT_OUTBOX_MAX_ATTEMPTS", 12),
+            outbox_backoff_base=_env_int("SUPPORT_OUTBOX_BACKOFF_BASE", 30),
+            outbox_backoff_cap=_env_int("SUPPORT_OUTBOX_BACKOFF_CAP", 1800),
         )

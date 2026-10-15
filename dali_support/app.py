@@ -24,29 +24,46 @@ def create_app(config: Config | None = None) -> FastAPI:
     store = Store(cfg.db_url)
     store.bootstrap()
     tg = TelegramOps(cfg.tg_bot_token, cfg.tg_group_id)
-    relay = Relay(store, tg, cfg.product_callback_url, cfg.callback_secret)
+    relay = Relay(store, tg, cfg.product_callback_url, cfg.callback_secret,
+                  outbox_ttl=cfg.outbox_ttl, outbox_max_attempts=cfg.outbox_max_attempts,
+                  outbox_backoff_base=cfg.outbox_backoff_base, outbox_backoff_cap=cfg.outbox_backoff_cap)
 
-    @contextlib.asynccontextmanager
-    async def lifespan(_app: FastAPI):
-        poll = asyncio.create_task(tg.start_polling(relay.on_operator_message, relay.on_operator_command))
-
-        def _poll_done(task: asyncio.Task) -> None:
-            # Фоновая задача не должна умирать молча (конвенция logging.md): штатная отмена при
-            # shutdown — тихо, неожиданный сбой polling — ERROR с трейсбеком.
+    def _crash_logger(label: str):
+        # Фоновая задача не должна умирать молча (конвенция logging.md): штатная отмена при
+        # shutdown — тихо, неожиданный сбой — ERROR с трейсбеком.
+        def _cb(task: asyncio.Task) -> None:
             if task.cancelled():
                 return
             exc = task.exception()
             if exc is not None:
-                _LOG.error("[app] long-polling упал — ответы операторов не доходят: %s", exc, exc_info=exc)
+                _LOG.error("[app] фоновая задача %s упала: %s", label, exc, exc_info=exc)
+        return _cb
 
-        poll.add_done_callback(_poll_done)
-        _LOG.info("[app] dali-support поднят: long-polling операторской супергруппы запущен")
+    async def _outbox_loop() -> None:
+        """Периодически дорассылать неотданные ответы оператора (outbox повтор). Период — из настроек."""
+        while True:
+            await asyncio.sleep(cfg.outbox_retry_interval)
+            try:
+                await relay.retry_outbox_once()
+            except Exception:
+                _LOG.exception("[outbox] проход повторной доставки дал сбой")
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        poll = asyncio.create_task(tg.start_polling(relay.on_operator_message, relay.on_operator_command))
+        poll.add_done_callback(_crash_logger("long-polling"))
+        outbox = asyncio.create_task(_outbox_loop())
+        outbox.add_done_callback(_crash_logger("outbox-retry"))
+        _LOG.info("[app] dali-support поднят: long-polling супергруппы + повтор outbox (период %dс)",
+                  cfg.outbox_retry_interval)
         try:
             yield
         finally:
-            poll.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await poll
+            for task in (poll, outbox):
+                task.cancel()
+            for task in (poll, outbox):
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
             await tg.close()
 
     app = FastAPI(title="dali-support", version="0.1.0", lifespan=lifespan)

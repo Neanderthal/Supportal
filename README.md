@@ -27,7 +27,10 @@
 - `POST /v1/messages` (продукт → relay) — `{user_ref, text, display_name?, meta?}`, заголовок
   `X-Dali-Signature` (HMAC-SHA256 тела на `SUPPORT_INGRESS_SECRET`). Ответ: `{ok, ticket_id, thread_id}`.
 - **callback** (relay → продукт, на `SUPPORT_PRODUCT_CALLBACK_URL`) — `{event, user_ref, ticket_id, text, operator}`,
-  тот же HMAC на `SUPPORT_CALLBACK_SECRET`. `event ∈ {message, ticket_closed}`.
+  тот же HMAC на `SUPPORT_CALLBACK_SECRET`. `event ∈ {message, ticket_closed}`. Ответ продукта —
+  `{ok, delivered}`: `delivered` = число живых доставок; `0` → адресат оффлайн, relay положит в **outbox** и
+  повторит callback с backoff до доставки/TTL. Поля `delivered` нет → считаем доставленным (простой продукт
+  без учёта доставки — без вечных повторов). Граница A: relay повторяет HTTP-callback, про сессии продукта не знает.
 
 Детали — [docs/api.md](docs/api.md).
 
@@ -47,7 +50,10 @@ Docker: `docker compose up -d` (сервис на :8500).
 | `SUPPORT_TG_GROUP_ID` | chat_id forum-супергруппы (бот — админ с «Управление темами») |
 | `SUPPORT_PRODUCT_CALLBACK_URL` | куда POST'ить ответы оператора (адаптер продукта) |
 | `SUPPORT_CALLBACK_SECRET` / `SUPPORT_INGRESS_SECRET` | HMAC обеих связок |
-| `SUPPORT_DB_URL` | хранилище тикетов (дефолт `sqlite:///./dali_support.db`) |
+| `SUPPORT_DB_URL` | хранилище тикетов + outbox (дефолт `sqlite:///./dali_support.db`) |
+| `SUPPORT_OUTBOX_RETRY_INTERVAL` | период фонового повтора outbox, с (дефолт 30) |
+| `SUPPORT_OUTBOX_TTL` | сколько держим неотданный ответ до «сдаёмся», с (дефолт 86400) |
+| `SUPPORT_OUTBOX_MAX_ATTEMPTS` / `SUPPORT_OUTBOX_BACKOFF_BASE` / `SUPPORT_OUTBOX_BACKOFF_CAP` | потолок попыток / база и потолок backoff, с (12 / 30 / 1800) |
 | `RCA_LOG_LEVEL` | INFO/DEBUG; на INFO/WARNING — только метаданные, не текст сообщений |
 
 ## Тесты
@@ -57,14 +63,17 @@ uv run pytest tests/ -q     # оффлайн: стор + HMAC (aiogram/сеть 
 ```
 
 ## Состояние
-**Ф0–Ф2** реализованы и покрыты оффлайн-тестами (15 тестов, ruff чистый):
+**Ф0–Ф2 + Ф3b** реализованы и покрыты оффлайн-тестами (24 теста, ruff чистый):
 - **Ф1** ingress + callback: `/v1/messages` (HMAC-гейт), `relay.ingress` (find-or-create тикет → forum-топик →
   отправка), обратный путь оператор→callback (`on_operator_message`/`/close` → подписанный POST, fail-soft).
 - **Ф2** Telegram-сторона: `start_polling` (aiogram-хэндлеры топиков супергруппы — `/close`|`/ban`→команда,
   текст→ответ; фильтр «наша группа + внутри топика», неизвестные `/…` игнорируются), `ensure_topic`/`send_to_topic`.
+- **Ф3b** outbox повторной доставки: ответ оператора оффлайн-пользователю (callback вернул `delivered=0` /
+  упал) ложится в outbox, фоновый цикл повторяет callback с backoff до доставки или TTL. Durability — в
+  релее (переиспользуемом), продукт-адаптер остаётся тонким. Граница A сохранена (повтор HTTP, не сессии).
 
 Осталось: **smoke** на тестовой супергруппе + **IPv6-egress на VM** (Telegram с Timeweb достижим только по IPv6,
-§9 спеки) · адаптер в rca-chat (Ф3) · развёртывание в `compose.cloud.yml` + CD (Ф4). Не развёрнут.
+§9 спеки) · адаптер в rca-chat (Ф3, в репо rca-stack) · развёртывание в `compose.cloud.yml` + CD (Ф4). Не развёрнут.
 
 ## Происхождение
 Система **ДаЛи** (RCA-диагностика). Разведка рынка решений и обоснование «своего relay» — в rca-stack
