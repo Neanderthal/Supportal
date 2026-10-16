@@ -11,6 +11,8 @@ sends the last id it has seen and receives everything newer.
 from __future__ import annotations
 
 import logging
+import re
+from urllib.parse import quote
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -22,6 +24,23 @@ from .settings import get_bool, get_int
 from .tokens import verify_widget_token
 
 _LOG = logging.getLogger("supportal.widget")
+
+# Chars that must never reach a Content-Disposition value: quotes/backslash (break the quoted-string) and
+# CR/LF/control/DEL (header injection). The filename comes from the browser (?name=) or Telegram
+# (document.file_name) — untrusted.
+_UNSAFE_FILENAME = re.compile(r'[\r\n"\\\x00-\x1f\x7f]')
+
+
+def _content_disposition(filename: str) -> str:
+    """Build a safe `Content-Disposition: attachment` header value for an untrusted filename.
+
+    A raw `"` or CR/LF in the name would break or inject the header. We sanitize an ASCII `filename="…"`
+    fallback (unsafe chars → `_`) and additionally emit an RFC 5987 `filename*=UTF-8''…` (percent-encoded,
+    so newlines/quotes/non-ASCII can't break anything) that modern browsers prefer.
+    """
+    name = filename or "file"
+    ascii_name = _UNSAFE_FILENAME.sub("_", name).encode("ascii", "ignore").decode("ascii").strip() or "file"
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name, safe='')}"
 
 
 def _rate_limited(user_ref: str) -> bool:
@@ -134,7 +153,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
             raise HTTPException(status_code=404, detail="not found")
         headers = {}
         if not (att.mime or "").startswith("image/"):
-            headers["Content-Disposition"] = f'attachment; filename="{att.filename}"'
+            headers["Content-Disposition"] = _content_disposition(att.filename)
         return Response(content=att.data, media_type=att.mime or "application/octet-stream", headers=headers)
 
     return router
