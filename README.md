@@ -117,6 +117,10 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` �
 | `SUPPORT_ATTACHMENTS_MAX_MB` | 10 | max upload size, MB |
 | `SUPPORT_VISITOR_CONTEXT` | off | post a one-time visitor-context block (page URL/title + custom fields) into a new topic |
 | `SUPPORT_CSAT` | off | after `/close`, show a 1..5 star rating in the widget → feed row + posted into the topic (needs `csat:true` in `/support/config`) |
+| `SUPPORT_BUSINESS_HOURS` | off | out-of-hours → a one-time "we're away" auto-reply (widget + topic); needs `SUPPORT_HOURS` |
+| `SUPPORT_HOURS` | — | schedule, e.g. `mon-fri 09:00-18:00; sat 10:00-14:00` (`;`-separated `<days> HH:MM-HH:MM`) |
+| `SUPPORT_HOURS_TZ` | UTC | IANA timezone for the schedule (e.g. `Europe/Moscow`) |
+| `SUPPORT_AWAY_MESSAGE` | (built-in) | the out-of-hours auto-reply text |
 
 ## HTTP API
 

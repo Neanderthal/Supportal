@@ -23,6 +23,15 @@ SUPPORT_VISITOR_CONTEXT: off
 # feed and is posted into the ticket's topic. The product must also expose csat:true in /support/config. Default: off.
 SUPPORT_CSAT: off
 
+# Business hours / auto-away: when a ticket is opened outside the schedule, the user gets a one-time
+# "we're away" auto-reply (in the widget + a note in the topic). Default: off. A schedule is required
+# (empty → the feature stays inert). Grammar: ";"-separated "<days> HH:MM-HH:MM" clauses; <days> is a
+# range (mon-fri), a single day (sat) or a comma list (mon,wed,fri). end < start crosses midnight.
+SUPPORT_BUSINESS_HOURS: off
+# SUPPORT_HOURS: mon-fri 09:00-18:00; sat 10:00-14:00
+# SUPPORT_HOURS_TZ: Europe/Moscow           # IANA timezone; default UTC
+# SUPPORT_AWAY_MESSAGE: Thanks for reaching out! We're away right now and will reply during business hours.
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

@@ -84,6 +84,12 @@
 .supportal-csat-busy { opacity: 0.5; pointer-events: none; }
 .supportal-csat-done { font-style: italic; }
 
+/* Out-of-hours auto-reply (feature SUPPORT_BUSINESS_HOURS): a muted operator bubble with a clock accent. */
+.supportal-away .supportal-bubble {
+  background: hsl(var(--ds-muted)); color: hsl(var(--ds-muted-fg));
+  border-left: 3px solid hsl(var(--ds-primary)); font-style: italic;
+}
+
 /* Attachments (feature SUPPORT_ATTACHMENTS): inline image / file link inside a bubble. */
 .supportal-media {
   display: block; margin-top: 0.35rem; max-width: 100%; max-height: 260px;

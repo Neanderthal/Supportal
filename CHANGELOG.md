@@ -35,6 +35,10 @@ All notable changes to this project are documented here. The format is based on
   star prompt under the close notice; the rating is recorded as a `kind:"csat"` feed row and posted into the
   ticket's topic (`POST /v1/widget/csat`). The `messages` feed grows a `kind` column
   (`msg|csat_request|csat`). The product advertises `csat:true` in `/support/config`; the demo shows it.
+- Business hours / auto-away (`SUPPORT_BUSINESS_HOURS`, default off): a ticket opened outside the
+  `SUPPORT_HOURS` schedule (`;`-separated `<days> HH:MM-HH:MM`, `SUPPORT_HOURS_TZ` timezone) gets a one-time
+  `SUPPORT_AWAY_MESSAGE` auto-reply — an `out` `kind:"away"` feed row plus a `⏰ (auto-away)` note in the
+  topic. Schedule parsing is fail-open; the demo is rigged after-hours to show it.
 
 ### Changed
 - Translated the whole project to English: the `docs/` design docs, all in‑code comments,
