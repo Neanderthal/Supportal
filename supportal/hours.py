@@ -77,11 +77,11 @@ def is_within(schedule: str, tz: str = "UTC", now: datetime | None = None) -> bo
         now = datetime.now(zone)
     wd, t = now.weekday(), now.time()
     for days, start, end in windows:
-        if wd not in days:
-            continue
         if start <= end:
-            if start <= t < end:
+            if wd in days and start <= t < end:
                 return True
-        elif t >= start or t < end:        # window crosses midnight
+        # Window crosses midnight: the evening part belongs to the start day, the early-morning tail to the
+        # NEXT day — so `sat 01:00` is still inside `fri 22:00-02:00` even though Sat isn't in the schedule.
+        elif (wd in days and t >= start) or ((wd - 1) % 7 in days and t < end):
             return True
     return False
