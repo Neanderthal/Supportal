@@ -49,6 +49,8 @@ os.environ.setdefault("SUPPORT_CANNED_REPLIES",
 os.environ.setdefault("SUPPORT_RECEIPTS", "on")   # read receipts: ✓ delivered + the operator console shows "seen"
 os.environ.setdefault("SUPPORT_GDPR", "on")       # GDPR export/erase buttons on the user page
 os.environ.setdefault("SUPPORT_METRICS", "on")    # GET /metrics (Prometheus) reflects the demo's data
+os.environ.setdefault("SUPPORT_SSE", "on")        # push updates over SSE (replies appear ~instantly, not ~4s)
+os.environ.setdefault("SUPPORT_SSE_INTERVAL", "0.5")
 # AI auto-answer: point at the demo KB. There is no real LLM key in the demo, so we stub supportal.ai.auto_answer
 # below with an OFFLINE keyword matcher over the same KB docs — the real feature calls an OpenAI-compatible API.
 os.environ.setdefault("SUPPORT_AI", "on")
@@ -158,7 +160,7 @@ app.include_router(build_router(relay, "demo-ingress-secret"))
 async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
-            "ttl": 900, "attachments": True, "context": True, "csat": True, "receipts": True,
+            "ttl": 900, "attachments": True, "context": True, "csat": True, "receipts": True, "sse": True,
             "strings": DEMO_STRINGS}
 
 

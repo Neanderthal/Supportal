@@ -56,6 +56,12 @@ SUPPORT_GDPR: off
 # Unauthenticated — only expose it on an internal network / scrape target. Default: off.
 SUPPORT_METRICS: off
 
+# SSE transport: push feed changes to the widget over Server-Sent Events (one long-lived connection, lower
+# latency than polling) instead of ~4s polling. The product must also expose sse:true in /support/config;
+# the widget falls back to polling when off/unavailable. Default: off.
+SUPPORT_SSE: off
+SUPPORT_SSE_INTERVAL: 1.0          # server-side change-detection interval, seconds
+
 # AI auto-answer: stuff a few short .md docs (SUPPORT_AI_KB_DIR) into an OpenAI-compatible model's context and
 # auto-reply before handing off to a human (the model replies HANDOFF when the KB doesn't cover the question).
 # NOT a RAG pipeline — just docs-in-context. Endpoint + key are secrets → keep them in .env, not here. Default: off.

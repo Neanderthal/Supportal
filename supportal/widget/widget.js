@@ -125,11 +125,40 @@
       .catch(function () { /* network blipped — the next tick retries */ });
   }
 
+  var pollingOn = false;
   function pollLoop() {
-    pollOnce().then(function () {
-      var delay = (typeof document.hidden === "boolean" && document.hidden) ? POLL_HIDDEN : POLL_VISIBLE;
-      setTimeout(pollLoop, delay);
-    });
+    if (pollingOn) return;            // one loop only (SSE fallback may call this)
+    pollingOn = true;
+    (function tick() {
+      pollOnce().then(function () {
+        var delay = (typeof document.hidden === "boolean" && document.hidden) ? POLL_HIDDEN : POLL_VISIBLE;
+        setTimeout(tick, delay);
+      });
+    })();
+  }
+
+  // ── SSE transport (feature SUPPORT_SSE) ────────────────────────────────────────
+  // Push feed changes over one long-lived EventSource (lower latency than polling). Falls back to polling
+  // when the feature is off, EventSource is unavailable, or the stream repeatedly errors.
+  var es = null, sseFails = 0;
+  function startStream() {
+    if (!(cfg && cfg.sse) || typeof EventSource === "undefined") return false;
+    // EventSource can't set the Authorization header → pass the token in the query (same short-lived token).
+    try {
+      es = new EventSource(apiUrl("/v1/widget/stream?since=" + lastSeq + "&token=" + encodeURIComponent(cfg.token)));
+    } catch (e) { return false; }
+    es.onmessage = function (ev) {
+      sseFails = 0;
+      var j; try { j = JSON.parse(ev.data); } catch (e) { return; }
+      if (j.messages) ingest(j.messages);
+      if (typeof j.cursor === "number" && j.cursor > lastSeq) lastSeq = j.cursor;
+    };
+    es.onerror = function () {
+      if (es) { es.close(); es = null; }
+      if (++sseFails <= 3) refreshToken().then(function (ok) { if (ok) startStream(); else pollLoop(); });
+      else pollLoop();                // give up on SSE → polling (the contract is identical)
+    };
+    return true;
   }
 
   // ── feed ─────────────────────────────────────────────────────────────────────
@@ -449,7 +478,7 @@
         for (var k in STRINGS) { if (typeof cfg.strings[k] === "string") STRINGS[k] = cfg.strings[k]; }
       }
       build();
-      pollLoop();
+      if (!startStream()) pollLoop();   // SSE push when enabled/available, else fall back to polling
     });
   }
 

@@ -128,6 +128,7 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` â
 | `SUPPORT_GDPR` | off | enable `POST /v1/admin/export\|delete {user_ref}` (HMAC) to export or erase a user's data |
 | `SUPPORT_METRICS` | off | expose `GET /metrics` (Prometheus text); unauthenticated â€” serve on an internal network only |
 | `SUPPORT_AI` | off | LLM auto-answer from a small md knowledge base before human handoff (needs `SUPPORT_AI_API_BASE`/`_KEY` + `SUPPORT_AI_KB_DIR`) |
+| `SUPPORT_SSE` | off | push feed changes over Server-Sent Events (lower latency than polling; needs `sse:true` in `/support/config`) |
 
 ## HTTP API
 

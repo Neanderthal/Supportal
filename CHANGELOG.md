@@ -60,6 +60,9 @@ All notable changes to this project are documented here. The format is based on
   `SUPPORT_AI_KB_DIR` are stuffed into an OpenAI-compatible model's context (`SUPPORT_AI_API_BASE/_KEY/_MODEL`);
   it answers from them (a background 🤖 `kind:"ai"` feed row + topic note) or replies `HANDOFF` for a human
   (`supportal/ai.py`; fail-soft). The demo ships two Spanish KB docs and stubs the LLM offline.
+- SSE transport (`SUPPORT_SSE`, default off): `GET /v1/widget/stream` pushes the same `WidgetPoll` payloads over
+  Server-Sent Events (one long-lived connection, `SUPPORT_SSE_INTERVAL` server-side detection) → lower latency
+  than polling. The widget uses `EventSource` (token via query) when `sse:true` and falls back to polling. Contract preserved.
 
 ### Changed
 - Docs brought in line with the shipped code (code-review follow-up): documented `POST /v1/widget/upload`
