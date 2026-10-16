@@ -1,5 +1,5 @@
 # supportal — embeddable relay "web-chat user ⇄ operator in Telegram".
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="supportal" \
       org.opencontainers.image.description="Embeddable relay: web-chat user to support operator in Telegram" \
