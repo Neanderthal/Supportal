@@ -9,9 +9,9 @@ import asyncio, os, tempfile
 
 import httpx
 
-from dali_support.models import OperatorEvent
-from dali_support.relay import Relay
-from dali_support.store import Store
+from supportal.models import OperatorEvent
+from supportal.relay import Relay
+from supportal.store import Store
 
 _EV = OperatorEvent(event="message", user_ref="eng@x", ticket_id="t1", text="проверьте сапун", operator="op1")
 
@@ -61,7 +61,7 @@ class _Client:
 
 
 def _store() -> Store:
-    path = os.path.join(tempfile.mkdtemp(prefix="dali_support_"), "t.db")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_"), "t.db")
     s = Store(f"sqlite:///{path}")
     s.bootstrap()
     return s

@@ -1,5 +1,5 @@
 [project]
-name = "dali-support"
+name = "supportal"
 version = "0.1.0"
 description = "Embeddable relay: web-chat user ⇄ support operator in Telegram (forum topics)"
 readme = "README.md"
@@ -32,10 +32,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Neanderthal/dali-support"
-Repository = "https://github.com/Neanderthal/dali-support"
-Issues = "https://github.com/Neanderthal/dali-support/issues"
-Changelog = "https://github.com/Neanderthal/dali-support/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Neanderthal/supportal"
+Repository = "https://github.com/Neanderthal/supportal"
+Issues = "https://github.com/Neanderthal/supportal/issues"
+Changelog = "https://github.com/Neanderthal/supportal/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
@@ -47,7 +47,7 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-pythonpath = ["."]   # tests/ импортят пакет dali_support из корня репозитория
+pythonpath = ["."]   # tests/ импортят пакет supportal из корня репозитория
 
 [tool.ruff]
 line-length = 120

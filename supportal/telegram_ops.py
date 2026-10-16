@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 
-_LOG = logging.getLogger("dali.support.tg")
+_LOG = logging.getLogger("supportal.tg")
 
 OnMessage = Callable[[int, str, str, int], Awaitable[None]]  # (thread_id, text, operator, tg_message_id) → None
 OnCommand = Callable[[int, str, str], Awaitable[None]]       # (thread_id, command, operator) → None

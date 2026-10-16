@@ -14,7 +14,7 @@ from .models import IngressMessage, IngressResult, OperatorEvent
 from .store import Store
 from .telegram_ops import TelegramOps
 
-_LOG = logging.getLogger("dali.support.relay")
+_LOG = logging.getLogger("supportal.relay")
 
 # Имя отвечающего, которое ВИДИТ пользователь в виджете — всегда обезличенное «Оператор» (реальный
 # username/имя оператора НЕ уходит в ленту/браузер; атрибуция конкретного оператора остаётся в самом
@@ -23,7 +23,7 @@ OPERATOR_DISPLAY = "Оператор"
 
 
 def sign(body: bytes, secret: str) -> str:
-    """HMAC-SHA256 тела для заголовка X-Dali-Signature (обе стороны контракта сверяют compare_digest)."""
+    """HMAC-SHA256 тела для заголовка X-Supportal-Signature (обе стороны контракта сверяют compare_digest)."""
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
@@ -143,7 +143,7 @@ class Relay:
         (обратная совместимость с продуктом, который не ведёт учёт доставки → без вечных повторов)."""
         import httpx
         body = ev.model_dump_json().encode()
-        headers = {"Content-Type": "application/json", "X-Dali-Signature": sign(body, self._callback_secret)}
+        headers = {"Content-Type": "application/json", "X-Supportal-Signature": sign(body, self._callback_secret)}
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(self._callback_url, content=body, headers=headers)

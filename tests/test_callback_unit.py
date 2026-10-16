@@ -8,8 +8,8 @@ import asyncio, hmac, json, os, tempfile
 
 import httpx
 
-from dali_support.relay import Relay, sign
-from dali_support.store import Store
+from supportal.relay import Relay, sign
+from supportal.store import Store
 
 _CB_URL = "http://product/support/push"
 _CB_SECRET = "cb-secret"
@@ -65,7 +65,7 @@ class _RaisingClient:
 
 
 def _store() -> Store:
-    path = os.path.join(tempfile.mkdtemp(prefix="dali_support_"), "t.db")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_"), "t.db")
     s = Store(f"sqlite:///{path}")
     s.bootstrap()
     return s
@@ -85,7 +85,7 @@ def test_operator_message_dispatches_signed_callback(monkeypatch):
     assert len(_FakeClient.posts) == 1
     url, content, headers = _FakeClient.posts[0]
     assert url == _CB_URL
-    assert hmac.compare_digest(headers["X-Dali-Signature"], sign(content, _CB_SECRET))
+    assert hmac.compare_digest(headers["X-Supportal-Signature"], sign(content, _CB_SECRET))
     ev = json.loads(content)
     assert ev == {"event": "message", "user_ref": "eng@x", "ticket_id": t.ticket_id,
                   "text": "проверьте сапун бака", "operator": "support1"}

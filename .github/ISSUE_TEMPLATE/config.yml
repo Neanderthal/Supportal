@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security report
-    url: https://github.com/Neanderthal/dali-support/security/advisories/new
+    url: https://github.com/Neanderthal/supportal/security/advisories/new
     about: Report a vulnerability privately — do not open a public issue.
   - name: Question / discussion
-    url: https://github.com/Neanderthal/dali-support/discussions
+    url: https://github.com/Neanderthal/supportal/discussions
     about: Ask a question or discuss an idea.

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-`dali-support` is pre‑1.0. Security fixes are applied to the latest `main` and the most
+`supportal` is pre‑1.0. Security fixes are applied to the latest `main` and the most
 recent tagged release.
 
 | Version | Supported |
@@ -24,7 +24,7 @@ disclosure timeline with you.
 
 ## Handling secrets and data
 
-`dali-support` relays arbitrary user text and holds bot credentials. When deploying:
+`supportal` relays arbitrary user text and holds bot credentials. When deploying:
 
 - Keep all secrets (`SUPPORT_TG_BOT_TOKEN`, `SUPPORT_WIDGET_SECRET`,
   `SUPPORT_*_SECRET`) in the environment only — never in code, config‑as‑code, or VCS.

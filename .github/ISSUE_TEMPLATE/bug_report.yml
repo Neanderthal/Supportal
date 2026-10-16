@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with dali-support
+description: Report a problem with supportal
 labels: ["bug"]
 body:
   - type: markdown

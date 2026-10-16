@@ -1,12 +1,12 @@
 # Roadmap
 
-Directional plan for `dali-support`. This is **not a commitment** — priorities shift
+Directional plan for `supportal`. This is **not a commitment** — priorities shift
 with feedback and contributions. Have an opinion or want to pick something up? Open an
 issue or a discussion (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Guiding principle
 
-`dali-support` is a **thin, product‑agnostic relay**, not a live‑chat platform. The key
+`supportal` is a **thin, product‑agnostic relay**, not a live‑chat platform. The key
 design choice: **the entire operator/agent experience is offloaded to Telegram**. So a
 large class of competitor features (agent console, mobile agent apps, team inbox, search,
 assignment, internal notes, agent notifications) are *out of scope by design* — Telegram

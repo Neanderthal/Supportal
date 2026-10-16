@@ -1,4 +1,4 @@
-"""DTO HTTP-контракта dali-support. Это и есть граница встраивания — продукт знает только эти формы."""
+"""DTO HTTP-контракта supportal. Это и есть граница встраивания — продукт знает только эти формы."""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

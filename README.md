@@ -1,14 +1,14 @@
-# dali-support
+# Supportal
 
 **Embeddable relay: web‑chat user ⇄ support operator in Telegram.**
 
 A user types from a support widget inside your web product; an operator reads and
 replies from a **Telegram forum topic**; the reply flows back into the user's live
-session. `dali-support` is a small, self‑contained FastAPI service that knows
+session. `supportal` is a small, self‑contained FastAPI service that knows
 **nothing about your product** — only an opaque `user_ref` and an HTTP contract — so
 it drops into any web app behind a thin adapter.
 
-[![CI](https://github.com/Neanderthal/dali-support/actions/workflows/ci.yml/badge.svg)](https://github.com/Neanderthal/dali-support/actions/workflows/ci.yml)
+[![CI](https://github.com/Neanderthal/supportal/actions/workflows/ci.yml/badge.svg)](https://github.com/Neanderthal/supportal/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -20,7 +20,7 @@ it drops into any web app behind a thin adapter.
 
 Off‑the‑shelf live‑chat tools cover the *inverse* flow — the user writes in Telegram
 while the operator sits in a vendor web console (Chatwoot, Jivo, Crisp, …). The
-"**user in the web, operator in Telegram**" flow is niche. `dali-support` keeps every
+"**user in the web, operator in Telegram**" flow is niche. `supportal` keeps every
 conversation inside your own Telegram workspace, reuses infrastructure you already run
 (a bot, a supergroup), and sends nothing to third parties.
 
@@ -28,7 +28,7 @@ conversation inside your own Telegram workspace, reuses infrastructure you alrea
 
 - 🧩 **Product‑agnostic** — the relay only sees an opaque `user_ref` and an HTTP
   contract. Zero framework coupling.
-- 💬 **Drop‑in widget** — a vanilla‑JS/CSS bundle (`dali_support/widget/`), no React,
+- 💬 **Drop‑in widget** — a vanilla‑JS/CSS bundle (`supportal/widget/`), no React,
   no build step. Embed with one `<script>` + `<link>`.
 - 🎫 **1 topic = 1 ticket** — each user gets a dedicated Telegram forum topic; operator
   commands `/close`, `/clear`, `/help`, `/del`.
@@ -48,11 +48,11 @@ conversation inside your own Telegram workspace, reuses infrastructure you alrea
 
 ```
 browser user                                    support operator (Telegram)
-  widget 💬 (dali_support/widget/)                     ▲
+  widget 💬 (supportal/widget/)                     ▲
   │  POST /v1/widget/send            (Bearer token)    │ reply in topic
   │  GET  /v1/widget/messages?since= (polling ~4s)     │
   ▼                                                    │
-dali-support  ──createForumTopic / sendMessage──▶  forum supergroup
+supportal  ──createForumTopic / sendMessage──▶  forum supergroup
         ▲ writes `messages` feed ◀── long-polling getUpdates ◀──┘
 ```
 
@@ -71,8 +71,8 @@ Two contours share one relay:
 # with uv (https://docs.astral.sh/uv/)
 uv sync
 cp .env.example .env         # fill in bot token, group id, SUPPORT_WIDGET_SECRET
-uv run uvicorn dali_support.app:app --port 8500
-curl localhost:8500/health   # {"status":"ok","service":"dali-support"}
+uv run uvicorn supportal.app:app --port 8500
+curl localhost:8500/health   # {"status":"ok","service":"supportal"}
 ```
 
 With Docker:
@@ -95,7 +95,7 @@ Secrets and settings come from the environment (`.env`) — see
 | `SUPPORT_ALLOWED_ORIGIN` | product origin for CORS (local cross‑origin dev; empty → no CORS, same‑origin in prod) |
 | `SUPPORT_PRODUCT_CALLBACK_URL` | **contour B:** where to POST operator replies; empty → callback/outbox dormant |
 | `SUPPORT_CALLBACK_SECRET` / `SUPPORT_INGRESS_SECRET` | HMAC secrets for the two contour‑B legs |
-| `SUPPORT_DB_URL` | storage for tickets + feed + outbox (default `sqlite:///./dali_support.db`) |
+| `SUPPORT_DB_URL` | storage for tickets + feed + outbox (default `sqlite:///./supportal.db`) |
 | `SUPPORT_HTTP_PORT` | relay port (default 8500) |
 | `SUPPORT_OUTBOX_RETRY_INTERVAL` / `_TTL` / `_MAX_ATTEMPTS` / `_BACKOFF_BASE` / `_BACKOFF_CAP` | contour‑B outbox retry tuning |
 | `SUPPORT_LOG_LEVEL` | `INFO`/`DEBUG`; at INFO/WARNING only metadata is logged, never message text |
@@ -106,9 +106,9 @@ See [`docs/api.md`](docs/api.md) for the full contract. In short:
 
 - **Contour A** (Bearer token): `POST /v1/widget/send {text}` → `{ok, message_id}`;
   `GET /v1/widget/messages?since=<seq>` → `{messages:[…], cursor}`.
-- **Contour B** (HMAC `X-Dali-Signature`): `POST /v1/messages`; signed callback to
+- **Contour B** (HMAC `X-Supportal-Signature`): `POST /v1/messages`; signed callback to
   `SUPPORT_PRODUCT_CALLBACK_URL`.
-- `GET /health` → `{"status":"ok","service":"dali-support"}`.
+- `GET /health` → `{"status":"ok","service":"supportal"}`.
 
 ## Telegram setup (one‑time)
 
@@ -126,8 +126,8 @@ Your product does exactly two things (a thin adapter):
 
 1. **Mint a token** for the logged‑in user at `POST /support/config`
    (identity resolved server‑side) using `SUPPORT_WIDGET_SECRET`. The token scheme is
-   defined once in [`dali_support/tokens.py`](dali_support/tokens.py).
-2. **Vendor the widget bundle** (`dali_support/widget/widget.{js,css}`) into your static
+   defined once in [`supportal/tokens.py`](supportal/tokens.py).
+2. **Vendor the widget bundle** (`supportal/widget/widget.{js,css}`) into your static
    assets and expose the relay at same‑origin `/support-api/v1/widget/*` via your reverse proxy.
 
 Full integration guide: [`docs/integration.md`](docs/integration.md).
@@ -136,7 +136,7 @@ Full integration guide: [`docs/integration.md`](docs/integration.md).
 
 SQLite by default (zero infrastructure). For a multi‑user / fault‑tolerant setup,
 implement the same `store.Store` interface over Postgres and inject it in
-`app.create_app`. Schema and methods: [`dali_support/store.py`](dali_support/store.py).
+`app.create_app`. Schema and methods: [`supportal/store.py`](supportal/store.py).
 
 ## Development
 
@@ -151,7 +151,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the PR workflow.
 ## Project layout
 
 ```
-dali_support/
+supportal/
 ├── config.py        # env → Config (secrets from env only)
 ├── models.py        # DTOs — the embedding boundary
 ├── store.py         # Store: tickets ↔ topic ↔ user + messages feed (SQLite)

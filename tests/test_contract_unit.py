@@ -1,13 +1,13 @@
 """Оффлайн-юнит: стор (CRUD тикет↔топик) + HMAC-подпись контракта. Без сети/Telegram/aiogram."""
 import os, tempfile
 
-from dali_support.models import IngressMessage
-from dali_support.relay import sign
-from dali_support.store import Store
+from supportal.models import IngressMessage
+from supportal.relay import sign
+from supportal.store import Store
 
 
 def _store() -> Store:
-    path = os.path.join(tempfile.mkdtemp(prefix="dali_support_"), "t.db")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_"), "t.db")
     s = Store(f"sqlite:///{path}")
     s.bootstrap()
     return s

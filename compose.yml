@@ -1,10 +1,10 @@
-# dali-support — relay «веб-чат ↔ оператор в Telegram».
+# supportal — relay «веб-чат ↔ оператор в Telegram».
 # Co-location рядом с продуктом (та же docker-сеть) либо отдельный хост, доступный продукту по сети.
 services:
-  dali-support:
+  supportal:
     build: .
-    image: dali-support:local
-    container_name: dali-support
+    image: supportal:local
+    container_name: supportal
     restart: unless-stopped
     env_file: .env
     ports:
