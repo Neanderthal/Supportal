@@ -146,6 +146,9 @@ Your product does exactly two things (a thin adapter):
 2. **Vendor the widget bundle** (`supportal/widget/widget.{js,css}`) into your static
    assets and expose the relay at same‑origin `/support-api/v1/widget/*` via your reverse proxy.
 
+**Localization (i18n):** the widget copy is English by default; the product localizes it by returning a
+`strings` map from `/support/config` (the one server‑generated line is the `SUPPORT_CLOSED_NOTICE` setting).
+
 Full integration guide: [`docs/integration.md`](docs/integration.md).
 
 ## Storage

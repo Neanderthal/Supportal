@@ -18,6 +18,20 @@ The widget takes its palette from the host's design tokens in the **shadcn forma
 ⚠️ **Not hex and not `hsl(...)`** — `hsl(#2563eb)` is invalid and the bubbles will "break" (become invisible).
 No tokens — the widget uses its built-in fallbacks and stays readable. Example — `examples/demo/index.html`.
 
+## Widget localization (i18n)
+The widget ships **English** defaults and renders them via `textContent`/`setAttribute` (never `innerHTML`).
+The product knows the user's language, so it localizes by returning an optional **`strings`** object in
+`POST /support/config`; provided keys override the defaults, the rest stay English:
+
+```json
+→ 200 {"api_base":"/support-api","token":"…","ttl":900,
+       "strings":{"title":"Soporte","greeting":"Describe tu problema…","placeholder":"Mensaje…","send":"Enviar"}}
+```
+Keys: `title`, `support` (launcher aria-label), `close`, `greeting`, `placeholder`, `send`, `attach`,
+`sendFail`, `uploadFail`, `uploading` (`{name}` is substituted). The only **server**-generated user-facing
+line is the ticket-closed notice — localize it with the `SUPPORT_CLOSED_NOTICE` setting (operator replies
+come from Telegram in the operator's own language).
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

@@ -21,7 +21,24 @@
   var CONFIG_URL = "/support/config";          // same-origin product endpoint (returns the token)
   var POLL_VISIBLE = 4000, POLL_HIDDEN = 20000;
 
-  var cfg = null;          // {api_base, token, ttl}
+  // UI copy — English defaults. The product may localize by returning a `strings` object in
+  // /support/config (it knows the user's language); provided keys override these (i18n).
+  // Applied via textContent/setAttribute (never innerHTML) so product-supplied copy can't inject HTML.
+  var STRINGS = {
+    title: "Support",
+    support: "Support",                     // launcher (fab) aria-label
+    close: "Close",
+    greeting: "Describe your question — a support operator will reply. The reply will arrive here;"
+      + " you don't have to wait on the page.",
+    placeholder: "Message…",
+    send: "Send",
+    attach: "Attach a file",
+    sendFail: "⚠️ Couldn't send the message. Please try again.",
+    uploadFail: "⚠️ Couldn't upload the file.",
+    uploading: "📤 Uploading {name}…"
+  };
+
+  var cfg = null;          // {api_base, token, ttl, strings?}
   var lastSeq = 0;         // polling cursor by seq (insert/edit/delete)
   var unread = 0;          // unread operator replies while the panel is closed
   var firstSync = true;    // the first poll = restore (don't badge history)
@@ -167,10 +184,10 @@
     var file = e.target.files && e.target.files[0];
     e.target.value = "";                      // allow re-picking the same file
     if (!file) return;
-    renderNote("📤 Uploading " + file.name + "…");
+    renderNote(STRINGS.uploading.replace("{name}", file.name));
     uploadFile(file).then(function (res) {
       if (res && res.message_id) pollOnce();  // pull the new attachment message in promptly
-      else renderNote("⚠️ Couldn't upload the file.");
+      else renderNote(STRINGS.uploadFail);
     });
   }
 
@@ -230,7 +247,7 @@
         }
         // the cursor is by seq (polling advances it); the echo is deduped by seen[id], no need to touch the cursor
       } else {
-        renderNote("⚠️ Couldn't send the message. Please try again.");
+        renderNote(STRINGS.sendFail);
       }
     });
   }
@@ -256,14 +273,13 @@
       '<button id="supportal-fab" type="button" aria-label="Support" aria-expanded="false">'
       + CHAT_ICON + '<span class="supportal-fab-badge" style="display:none"></span></button>'
       + '<section class="supportal-drawer" role="dialog" aria-label="Support chat">'
-      + '  <header class="supportal-drawer-head"><span class="supportal-drawer-title">Support</span>'
-      + '    <button class="supportal-drawer-close" type="button" aria-label="Close">&times;</button></header>'
-      + '  <div class="supportal-msg-list"><div class="supportal-greeting">Describe your question — a support operator will reply.'
-      + ' The reply will arrive here; you don\'t have to wait on the page.</div></div>'
+      + '  <header class="supportal-drawer-head"><span class="supportal-drawer-title"></span>'
+      + '    <button class="supportal-drawer-close" type="button">&times;</button></header>'
+      + '  <div class="supportal-msg-list"><div class="supportal-greeting"></div></div>'
       + '  <form class="supportal-composer">'
-      + '    <button type="button" class="supportal-attach" aria-label="Attach a file">' + CLIP_ICON + '</button>'
+      + '    <button type="button" class="supportal-attach">' + CLIP_ICON + '</button>'
       + '    <input type="file" class="supportal-file-input" hidden>'
-      + '    <textarea rows="1" placeholder="Message…" class="supportal-input"></textarea>'
+      + '    <textarea rows="1" class="supportal-input"></textarea>'
       + '    <button type="submit" class="supportal-send" aria-label="Send">'
       + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"'
       + ' stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/>'
@@ -280,6 +296,16 @@
     els.form = root.querySelector(".supportal-composer");
     els.attach = root.querySelector(".supportal-attach");
     els.fileInput = root.querySelector(".supportal-file-input");
+    els.title = root.querySelector(".supportal-drawer-title");
+
+    // Localized copy — set as text/attributes (never innerHTML), so product-supplied strings are inert.
+    els.title.textContent = STRINGS.title;
+    els.greeting.textContent = STRINGS.greeting;
+    els.input.setAttribute("placeholder", STRINGS.placeholder);
+    els.fab.setAttribute("aria-label", STRINGS.support);
+    els.attach.setAttribute("aria-label", STRINGS.attach);
+    root.querySelector(".supportal-send").setAttribute("aria-label", STRINGS.send);
+    root.querySelector(".supportal-drawer-close").setAttribute("aria-label", STRINGS.close);
 
     // Attachments are a feature flag: the product's /support/config reports whether the relay has it on.
     if (!(cfg && cfg.attachments)) { els.attach.style.display = "none"; }
@@ -300,6 +326,9 @@
     fetchConfig().then(function (j) {
       if (!j) { setTimeout(start, 30000); return; }  // not logged in / disabled → quietly retry later
       cfg = j;
+      if (cfg.strings && typeof cfg.strings === "object") {   // product-supplied localization (i18n)
+        for (var k in STRINGS) { if (typeof cfg.strings[k] === "string") STRINGS[k] = cfg.strings[k]; }
+      }
       build();
       pollLoop();
     });

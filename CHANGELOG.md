@@ -24,6 +24,10 @@ All notable changes to this project are documented here. The format is based on
   (`POST /v1/widget/upload`) + inline image / download-link rendering; operator photos and
   documents from the topic are downloaded and relayed to the widget; bytes stored in the DB
   (`attachments` table), size-capped by `SUPPORT_ATTACHMENTS_MAX_MB`. The demo shows both directions.
+- Widget i18n: UI copy is extracted into overridable strings (English defaults), localized by the
+  product via a `strings` object in `POST /support/config` (applied via textContent/setAttribute, not
+  innerHTML). The server-generated ticket-closed notice is now the `SUPPORT_CLOSED_NOTICE` setting.
+  The demo ships a sample (Spanish) localization.
 
 ### Changed
 - Translated the whole project to English: the `docs/` design docs, all in‑code comments,

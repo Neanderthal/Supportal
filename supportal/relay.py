@@ -11,7 +11,7 @@ import logging
 import time
 
 from .models import IngressMessage, IngressResult, OperatorEvent
-from .settings import get_bool
+from .settings import get, get_bool
 from .store import Store
 from .telegram_ops import TelegramOps
 
@@ -137,8 +137,8 @@ class Relay:
             return
         if command == "/close":
             self._store.close(ticket.ticket_id)
-            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out",
-                                    OPERATOR_DISPLAY, "This ticket was closed by the operator.")
+            notice = get("SUPPORT_CLOSED_NOTICE", "This ticket was closed by the operator.")
+            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, notice)
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
         elif command == "/clear":

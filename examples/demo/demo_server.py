@@ -42,6 +42,14 @@ from supportal.widget_api import build_widget_router  # noqa: E402
 
 DEMO_SECRET = "demo-widget-secret"      # shared by /support/config (mint) and the widget API (verify)
 DEMO_USER = "demo@local"                # in production this is the logged-in user's normalized id
+# Sample product-supplied localization (Spanish) — demonstrates widget i18n via /support/config.
+DEMO_STRINGS = {
+    "title": "Soporte",
+    "greeting": "Describe tu consulta — un operador responderá aquí; no hace falta esperar en la página.",
+    "placeholder": "Mensaje…",
+    "send": "Enviar",
+    "attach": "Adjuntar un archivo",
+}
 HERE = Path(__file__).resolve().parent
 WIDGET_DIR = _REPO_ROOT / "supportal" / "widget"
 
@@ -97,7 +105,7 @@ app.include_router(build_widget_router(relay, DEMO_SECRET), prefix="/support-api
 async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
-            "ttl": 900, "attachments": True}
+            "ttl": 900, "attachments": True, "strings": DEMO_STRINGS}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────
