@@ -49,6 +49,30 @@ os.environ.setdefault("SUPPORT_CANNED_REPLIES",
 os.environ.setdefault("SUPPORT_RECEIPTS", "on")   # read receipts: ✓ delivered + the operator console shows "seen"
 os.environ.setdefault("SUPPORT_GDPR", "on")       # GDPR export/erase buttons on the user page
 os.environ.setdefault("SUPPORT_METRICS", "on")    # GET /metrics (Prometheus) reflects the demo's data
+# AI auto-answer: point at the demo KB. There is no real LLM key in the demo, so we stub supportal.ai.auto_answer
+# below with an OFFLINE keyword matcher over the same KB docs — the real feature calls an OpenAI-compatible API.
+os.environ.setdefault("SUPPORT_AI", "on")
+os.environ.setdefault("SUPPORT_AI_KB_DIR", str(Path(__file__).resolve().parent / "kb"))
+
+import supportal.ai as _ai  # noqa: E402
+
+
+async def _fake_auto_answer(question: str):
+    """Offline stand-in for the LLM: return the KB doc whose title words overlap the question, else hand off."""
+    kb_dir = os.environ.get("SUPPORT_AI_KB_DIR", "kb")
+    import glob
+    q = (question or "").lower()
+    hints = {"horarios.md": ("horario", "hora", "abren", "atienden", "atención"),
+             "contrasena.md": ("contraseña", "contrasena", "password", "acceso", "entrar", "olvid")}
+    for path in sorted(glob.glob(os.path.join(kb_dir, "*.md"))):
+        name = os.path.basename(path)
+        if any(w in q for w in hints.get(name, ())):
+            with open(path, encoding="utf-8") as fh:
+                return fh.read().strip()
+    return None   # HANDOFF — a human takes over
+
+
+_ai.auto_answer = _fake_auto_answer
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402

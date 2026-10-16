@@ -19,8 +19,12 @@ class Flags:
     OPENAPI = "SUPPORT_OPENAPI"       # read at startup (app.py), not hot
     GDPR = "SUPPORT_GDPR"
     METRICS = "SUPPORT_METRICS"
+    AI = "SUPPORT_AI"                 # LLM auto-answer from a small md knowledge base before human handoff
 
     # Values (read with settings.get_int / get / get_dict).
+    AI_MODEL = "SUPPORT_AI_MODEL"           # OpenAI-compatible chat model (e.g. deepseek-chat)
+    AI_KB_DIR = "SUPPORT_AI_KB_DIR"         # directory of short .md knowledge-base docs
+    AI_KB_MAX_CHARS = "SUPPORT_AI_KB_MAX_CHARS"   # cap on the KB text stuffed into the prompt
     RATE_LIMIT_MAX = "SUPPORT_RATE_LIMIT_MAX"
     RATE_LIMIT_WINDOW = "SUPPORT_RATE_LIMIT_WINDOW"
     ATTACHMENTS_MAX_MB = "SUPPORT_ATTACHMENTS_MAX_MB"

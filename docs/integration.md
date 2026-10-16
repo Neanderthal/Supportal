@@ -117,6 +117,19 @@ messages (by direction), stored attachments, pending outbox, plus `supportal_bui
 **unauthenticated**, so expose it only to your internal Prometheus scrape target (don't proxy it publicly).
 Point a scrape job at `http://<relay-host>:<port>/metrics`.
 
+## AI auto-answer (feature `SUPPORT_AI`, default off)
+A deliberately **minimal** knowledge-base auto-answer — *not* a RAG pipeline. Put a handful of short `.md` docs
+in `SUPPORT_AI_KB_DIR`; on each user message the relay stuffs them into an OpenAI-compatible model's context
+(`SUPPORT_AI_API_BASE` / `SUPPORT_AI_API_KEY` / `SUPPORT_AI_MODEL`, e.g. DeepSeek) and asks it to answer from
+them. If the KB covers the question, the answer is posted into the user's feed (a 🤖 `kind:"ai"` bubble) and a
+`🤖 (auto-answer)` note into the topic; if not, the model replies `HANDOFF` and a human takes over as usual.
+
+- Runs in the **background** — the user's send returns immediately; the answer arrives shortly after like a reply.
+- **Fail-soft**: empty/missing KB, missing credentials, or any API error → hand off (no auto-answer).
+- Endpoint + key are secrets → keep them in `.env` (not `settings.yaml`); the flag/model/KB-path are settings.
+- The demo ships two short Spanish KB docs (`examples/demo/kb/`) and stubs the LLM call offline with a keyword
+  matcher so it works without an API key — try asking about *horario* or *contraseña* in the widget.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.
