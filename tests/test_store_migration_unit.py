@@ -58,6 +58,19 @@ def test_store_rejects_non_sqlite_url():
         Store("postgresql://localhost/db")
 
 
+def test_changes_since_never_splits_a_single_seq_batch(tmp_path):
+    # A /clear stamps the whole feed with ONE seq. A page smaller than the batch must still return the WHOLE
+    # equal-seq group — otherwise the cursor (max seq) skips the rest next poll and bubbles survive /clear.
+    store = Store(f"sqlite:///{tmp_path / 'batch.db'}")
+    store.bootstrap()
+    t = store.create("u", "U")
+    for i in range(5):
+        store.add_message(t.ticket_id, "u", "in", "U", f"m{i}")
+    store.clear_messages("u")                                   # all 5 rows → one seq, deleted=1
+    rows = store.changes_since("u", 0, limit=2)                 # page smaller than the batch
+    assert len(rows) == 5 and len({r.seq for r in rows}) == 1 and all(r.deleted for r in rows)
+
+
 # ── atomic seq counter + WAL (arch review #1/#2) ───────────────────────────────
 def test_bootstrap_enables_wal_and_seeds_seq_counter(tmp_path):
     store = Store(f"sqlite:///{tmp_path / 'fresh.db'}")
