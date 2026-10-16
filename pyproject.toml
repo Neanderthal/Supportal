@@ -41,6 +41,7 @@ Changelog = "https://github.com/Neanderthal/supportal/blob/main/CHANGELOG.md"
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "pytest-cov>=5",
     "ruff>=0.6",
 ]
 
@@ -49,6 +50,13 @@ package = false
 
 [tool.pytest.ini_options]
 pythonpath = ["."]   # tests/ import the supportal package from the repo root
+
+[tool.coverage.run]
+source = ["supportal"]   # measure the package, not tests/ or examples/
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 85          # CI (and `pytest --cov`) fails below this; keeps the suite from regressing
 
 [tool.ruff]
 line-length = 120
