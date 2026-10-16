@@ -63,6 +63,11 @@ All notable changes to this project are documented here. The format is based on
 - SSE transport (`SUPPORT_SSE`, default off): `GET /v1/widget/stream` pushes the same `WidgetPoll` payloads over
   Server-Sent Events (one long-lived connection, `SUPPORT_SSE_INTERVAL` server-side detection) → lower latency
   than polling. The widget uses `EventSource` (token via query) when `sse:true` and falls back to polling. Contract preserved.
+- Reference PostgreSQL backend (`supportal/store_pg.py`): `SUPPORT_DB_URL=postgresql://…` selects it via
+  `store.make_store` (same `Store` contract as SQLite — seq cursor, edit/delete/clear, read receipts,
+  attachments, outbox, GDPR, metrics). Optional extra `supportal[postgres]` (psycopg 3); schema created
+  idempotently on startup. Covered by a live integration test (`tests/test_postgres_store_unit.py`, gated on
+  `SUPPORT_TEST_PG_URL`).
 
 ### Changed
 - Docs brought in line with the shipped code (code-review follow-up): documented `POST /v1/widget/upload`

@@ -152,10 +152,15 @@ unchanged — so the widget transparently **falls back to polling** when SSE is 
    closes the ticket.
 
 ## Storage
-Default — SQLite (`sqlite:///…`, self-contained). For larger-corpus / fault-tolerant **storage**
-implement a class with the `store.Store` interface over Postgres (the same `tickets` table) and swap it
-into `app.create_app`. The schema is in `supportal/store.py`. ⚠️ Postgres makes the *store* shared but does
-**not** by itself allow running more than one process — see the scaling note below.
+Default — SQLite (`sqlite:///…`, self-contained). For a multi-user / fault-tolerant deployment, point
+`SUPPORT_DB_URL` at Postgres (`postgresql://user:pass@host:5432/db`): `app.create_app` picks the backend by
+URL scheme (`store.make_store`), using the reference **`supportal/store_pg.py`** (`PostgresStore`, same
+contract as the SQLite store — seq cursor, edit/delete, read receipts, attachments, outbox, GDPR, metrics).
+Install the extra: `pip install 'supportal[postgres]'` (psycopg 3). Tables are created idempotently on
+startup (`bootstrap()`, `CREATE TABLE IF NOT EXISTS`), so no separate migration step is needed for a fresh DB.
+The backend is covered by an integration test against a live DB (`tests/test_postgres_store_unit.py`, run it
+with `SUPPORT_TEST_PG_URL=postgresql://…`). ⚠️ Postgres makes the *store* shared but does **not** by itself
+allow running more than one process — see the scaling note below.
 
 ## Scaling — run exactly one process
 supportal is a **single-process service**. The Telegram long-poller, the outbox-retry loop and the in-memory
