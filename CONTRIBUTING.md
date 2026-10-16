@@ -18,11 +18,15 @@ uv run uvicorn supportal.app:app --port 8500
 ```bash
 uv run ruff check .          # lint (must be clean)
 uv run pytest tests/ -q      # offline unit tests — no network or Telegram required
+uv run pytest tests/ --cov=supportal --cov-report=term-missing   # with the coverage gate
 ```
 
 - The test suite is **fully offline**: `aiogram`, HTTP, and the DB are mocked, so tests
   run anywhere without a bot token or a live supergroup.
 - Please add or update tests for any behavior change and keep the suite green.
+- **Coverage gate:** CI runs the suite with `--cov` and fails below **85%** line coverage
+  (`[tool.coverage.report] fail_under` in `pyproject.toml`). Run the `--cov` command above
+  locally before a PR; a plain `pytest -q` run stays coverage‑free and fast.
 
 Optionally, install the pre‑commit hooks (runs ruff on commit):
 

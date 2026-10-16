@@ -31,8 +31,8 @@ jobs:
       - name: Lint (ruff)
         run: uv run ruff check .
 
-      - name: Tests (offline)
-        run: uv run pytest tests/ -q
+      - name: Tests + coverage (offline)
+        run: uv run pytest tests/ --cov=supportal --cov-report=term-missing
 
   docker-build:
     runs-on: ubuntu-latest
