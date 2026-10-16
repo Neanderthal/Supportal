@@ -81,6 +81,9 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- Bounded the free-text request fields (`supportal/models.py`, `supportal/widget_api.py`): `text` is capped
+  at 4096 chars (Telegram's message limit) on both contours and the CSAT `comment` at 500, declared at the
+  DTO boundary → a clean **422** instead of unbounded input or a failed Telegram send.
 - Concurrent first-contact from one user no longer creates duplicate Telegram topics
   (`supportal/relay.py`): find-or-create of a ticket+topic ran a check-then-act across `await ensure_topic`,
   so two simultaneous first messages (two tabs / retry / send+upload) both created a topic. Serialized per
