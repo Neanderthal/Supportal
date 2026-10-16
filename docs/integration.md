@@ -53,7 +53,8 @@ survives a reload), and posted into the ticket's Telegram topic (`📊 CSAT: …
 
 `/support/config` should report `"csat": true` so the widget renders the prompt only when the relay has the
 feature on (mirrors `context`/`attachments`). Localize the prompt/thanks copy with the `csatPrompt`/`csatThanks`
-`strings` keys. Each closed conversation can be rated once; a newer close re-arms the prompt.
+`strings` keys. The **widget** shows the prompt once per close (a newer close re-arms it); the relay itself
+does **not** deduplicate `POST /v1/widget/csat`, so a client that re-posts records multiple `csat` rows.
 
 ## Business hours / auto-away (feature `SUPPORT_BUSINESS_HOURS`, default off)
 When on, a ticket opened **outside** the schedule gets a one-time "we're away" auto-reply: an `out` message

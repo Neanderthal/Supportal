@@ -24,7 +24,7 @@ The relay does not depend on the product: it knows only the opaque `user_ref` an
 - **On the product side** — a thin adapter: minting a token for the logged-in user (`POST /support/config`) +
   vendoring the bundle. The product provides only identity; the logic and the UI stay outside.
 
-**Non-goals (v1):** ticket queue/SLA/analytics, multiple products, attachments/media, multiple
+**Non-goals (v1):** ticket queue/SLA/analytics, multiple products, multiple
 operators per ticket, an "operator is typing" indicator, SSE instead of polling.
 
 ## Two contours
@@ -42,9 +42,11 @@ operators per ticket, an "operator is typing" indicator, SSE instead of polling.
 ```sql
 tickets(ticket_id PK, user_ref, display_name, thread_id UNIQUE, status 'open|closed', created_at, last_at)
 messages(id PK AUTOINCREMENT, ticket_id, user_ref, direction 'in|out', author, text, created_at,
-         tg_message_id, deleted, seq)
+         tg_message_id, deleted, seq, kind 'msg|csat_request|csat|away', read, attachment_id)
+attachments(id PK AUTOINCREMENT, user_ref, direction 'in|out', filename, mime, size, data BLOB, created_at)
 outbox(id PK AUTOINCREMENT, ticket_id, user_ref, event, text, operator, status 'pending|delivered|dead',
        attempts, created_at, next_attempt_at)
+seq_counter(v)   -- single-row monotonic source for messages.seq (atomic UPDATE … RETURNING)
 ```
 
 - **`tickets`** — one active topic per user (`get_open_by_user`) + the reverse route by
@@ -53,7 +55,13 @@ outbox(id PK AUTOINCREMENT, ticket_id, user_ref, event, text, operator, status '
   edits/recalls. `seq` is a monotonic cursor that grows on insert/edit/delete, so edits and deletions
   of old rows also reach the widget (`changes_since(user_ref, after_seq)`). Rows are persistent →
   a reply to an offline user is picked up on the next poll. `tg_message_id` links a row to the
-  Telegram message for edit-sync (`edited_message`) and `/del`; `deleted` is a soft delete.
+  Telegram message for edit-sync (`edited_message`) and `/del`; `deleted` is a soft delete. `kind`
+  distinguishes a normal message from the close-notice/CSAT/auto-away rows; `read` backs read-receipts
+  (`SUPPORT_RECEIPTS`); `attachment_id` → `attachments.id` when the row carries a file.
+- **`attachments`** (`SUPPORT_ATTACHMENTS`) — file bytes stored in the DB (no object store), size-capped
+  at upload, referenced by `messages.attachment_id`; served to the widget via `GET /v1/widget/attachment/{id}`.
+- **`seq_counter`** — a single-row counter bumped atomically (`UPDATE … RETURNING`) so `messages.seq` is
+  race-free even if DB work later moves off the event loop.
 - **`outbox`** (contour B) — operator replies the product did not confirm as delivered; a background loop
   retries the callback with backoff until `delivered>0` or TTL.
 
