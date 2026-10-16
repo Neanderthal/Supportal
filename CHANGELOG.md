@@ -52,6 +52,12 @@ All notable changes to this project are documented here. The format is based on
   labels, greeting, placeholder, error notice) and the operator "ticket closed" notice.
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
+### Fixed
+- Operator media that can't be fetched no longer vanishes silently (architecture review #6): a failed
+  `getFile`/download (commonly a file above the Bot API's 20 MB limit) is now logged and the operator is
+  told in the topic that the user received nothing (`MEDIA_FETCH_FAILED`), instead of dropping the file
+  with no signal (`supportal/telegram_ops.py`).
+
 ### Security
 - Enforce the attachment upload size cap **before buffering** (architecture review #4): `POST
   /v1/widget/upload` used to read the whole body into memory before the `SUPPORT_ATTACHMENTS_MAX_MB` check,

@@ -9,7 +9,7 @@ The real end-to-end is a manual smoke test on a test supergroup (plan Ph2).
 import asyncio
 from types import SimpleNamespace
 
-from supportal.telegram_ops import HELP_TEXT, TelegramOps, operator_name
+from supportal.telegram_ops import HELP_TEXT, MEDIA_FETCH_FAILED, TelegramOps, operator_name
 
 _DUMMY_TOKEN = "123456:abc"      # valid by format; the network is not touched until a bot method is called
 _GROUP_ID = -1001234567890
@@ -135,3 +135,36 @@ def test_clear_routes_to_command_and_help_posts_to_topic():
                             command=SimpleNamespace(command="help")))
     assert cmds == [(55, "/clear", "support1")]
     assert sent == [(55, HELP_TEXT)]
+
+
+def test_handle_media_download_failure_posts_operator_note():
+    # arch review #6: a failed download (e.g. file > 20 MB) must not vanish — on_media is NOT called and an
+    # operator-facing note is posted into the topic (the user got nothing).
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
+    notes = []
+
+    async def _fake_send(thread_id, text):
+        notes.append((thread_id, text))
+
+    async def _boom(file_id):
+        raise RuntimeError("file is too big (getFile 20 MB limit)")
+
+    tg.send_to_topic = _fake_send
+    tg._download = _boom
+    media_calls = []
+
+    async def on_media(*a):
+        media_calls.append(a)
+
+    async def _noop(*a):
+        return None
+
+    tg._register_handlers(_noop, _noop, _noop, _noop, on_media)
+    media_handler = tg._dp.message.handlers[1].callback      # [1] is the media handler
+    user = SimpleNamespace(username="support1", full_name="", id=1)
+    doc = SimpleNamespace(file_id="F1", file_name="big.zip", mime_type="application/zip")
+    msg = SimpleNamespace(message_thread_id=55, message_id=7, photo=None, document=doc, caption="", from_user=user)
+
+    asyncio.run(media_handler(msg))                           # must not raise
+    assert media_calls == []                                  # media dropped, not relayed
+    assert notes == [(55, MEDIA_FETCH_FAILED)]                # operator told in the topic

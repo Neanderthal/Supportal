@@ -9,10 +9,18 @@ contract) without aiogram installed (offline unit tests do not require it).
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 
 _LOG = logging.getLogger("supportal.tg")
+
+# Operator-facing note posted into the topic when an operator's file can't be fetched (e.g. above the Bot
+# API's 20 MB getFile limit). Hardcoded English like HELP_TEXT — operators read the topic in Telegram.
+MEDIA_FETCH_FAILED = (
+    "⚠️ Couldn't fetch that file to forward it to the user (the Telegram Bot API caps downloads at 20 MB). "
+    "The user did NOT receive it — please resend a smaller file or share a link."
+)
 
 OnMessage = Callable[[int, str, str, int], Awaitable[None]]  # (thread_id, text, operator, tg_message_id) → None
 OnCommand = Callable[[int, str, str], Awaitable[None]]       # (thread_id, command, operator) → None
@@ -144,7 +152,16 @@ class TelegramOps:
                 mime = d.mime_type or "application/octet-stream"
             else:
                 return
-            data = await self._download(file_id)
+            try:
+                data = await self._download(file_id)
+            except Exception:
+                # A failed getFile/download (commonly a file above the Bot API's 20 MB limit) must not
+                # vanish silently: log it and tell the operator in the topic that the user got nothing.
+                _LOG.warning("[op] media download failed thread=%s msg=%s mime=%s — dropped (file too large?)",
+                             message.message_thread_id, message.message_id, mime, exc_info=True)
+                with contextlib.suppress(Exception):
+                    await self.send_to_topic(message.message_thread_id, MEDIA_FETCH_FAILED)
+                return
             await on_media(message.message_thread_id, data, filename, mime, message.caption or "",
                            operator_name(message.from_user), message.message_id)
             _LOG.info("[op] media thread=%s msg=%s mime=%s size=%d",
