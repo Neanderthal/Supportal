@@ -9,9 +9,8 @@ Relay не зависит от продукта. Встраивающая сто
 3. **Личность:** `user_ref` — стабильный ключ (нормализованный логин). Один ключ на пользователя во всех
    вкладках/сессиях, иначе ответы разъедутся.
 
-Обзор типового адаптера (server-push в живую сессию, реестр `user_ref → session_id`, фолбэк по истёкшей
-сессии) — в спеке [support-relay-plan.md](support-relay-plan.md) §8; сам код адаптера пишется на стороне
-конкретного продукта.
+Типовой адаптер (server-push в живую сессию, реестр `user_ref → session_id`, фолбэк по истёкшей сессии)
+пишется на стороне конкретного продукта. Общая картина разделения — [architecture.md](architecture.md).
 
 ## Настройка Telegram-стороны (один раз)
 1. Создать бота у @BotFather → `SUPPORT_TG_BOT_TOKEN`.
@@ -32,4 +31,4 @@ Relay не зависит от продукта. Встраивающая сто
 - Telegram — egress long-polling. ⚠️ В некоторых сетях/облаках `api.telegram.org` достижим **только по
   IPv6**, а docker-сеть обычно без IPv6. Два пути: (а) включить IPv6-egress контейнеру; (б) **`SUPPORT_TG_PROXY`** —
   HTTP CONNECT forward-proxy на внешнем хосте с IPv4-egress к Telegram. Прокси стоит залочить по IP релея +
-  auth + только CONNECT:443 к `api.telegram.org`. См. спеку §9.
+  auth + только CONNECT:443 к `api.telegram.org`.
