@@ -19,6 +19,25 @@ class IngressResult(BaseModel):
     ok: bool = True
     ticket_id: str
     thread_id: int
+    message_id: int = 0   # id записанной строки ленты (виджет сопоставляет свой оптимистичный пузырь)
+
+
+class WidgetMessage(BaseModel):
+    """Строка ленты для браузерного виджета (GET /v1/widget/messages)."""
+
+    id: int
+    direction: str          # in | out
+    author: str = ""
+    text: str = ""
+    ts: float = 0.0
+
+
+class WidgetPoll(BaseModel):
+    """Ответ polling-опроса виджета: новые сообщения + последний id (курсор следующего запроса)."""
+
+    ok: bool = True
+    messages: list[WidgetMessage] = Field(default_factory=list)
+    last_id: int = 0
 
 
 class OperatorEvent(BaseModel):

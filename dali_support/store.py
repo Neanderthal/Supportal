@@ -37,6 +37,18 @@ class OutboxItem:
     next_attempt_at: float
 
 
+@dataclass
+class Message:
+    """Строка переписки (лента тикета). Единый источник правды для polling виджета и восстановления."""
+    id: int
+    ticket_id: str
+    user_ref: str
+    direction: str       # in (пользователь → оператор) | out (оператор/система → пользователь)
+    author: str          # кто написал (для показа): имя пользователя / оператора / «Система»
+    text: str
+    created_at: float
+
+
 class Store:
     def __init__(self, db_url: str) -> None:
         if not db_url.startswith("sqlite:///"):
@@ -73,6 +85,20 @@ class Store:
                    created_at  REAL NOT NULL,
                    next_attempt_at REAL NOT NULL)""")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_outbox_due ON outbox(status, next_attempt_at)")
+        # messages — лента переписки (обе стороны). Источник правды для polling браузерного виджета
+        # (GET /v1/widget/messages?after=<id>) и восстановления при перезагрузке. Монотонный AUTOINCREMENT
+        # id = курсор polling (виджет шлёт последний виденный id). Персистентна → переживает рестарт и
+        # оффлайн-пользователя (ответ оператора не теряется: подтянется при следующем опросе).
+        self._conn.execute(
+            """CREATE TABLE IF NOT EXISTS messages (
+                   id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                   ticket_id   TEXT NOT NULL,
+                   user_ref    TEXT NOT NULL,
+                   direction   TEXT NOT NULL,
+                   author      TEXT NOT NULL DEFAULT '',
+                   text        TEXT NOT NULL DEFAULT '',
+                   created_at  REAL NOT NULL)""")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_user ON messages(user_ref, id)")
         self._conn.commit()
 
     def _row(self, row: sqlite3.Row) -> Ticket:
@@ -151,3 +177,23 @@ class Store:
 
     def outbox_pending_count(self) -> int:
         return self._conn.execute("SELECT count(*) FROM outbox WHERE status='pending'").fetchone()[0]
+
+    # ── messages (лента переписки для polling виджета) ─────────────────────────
+    def _message_row(self, row: sqlite3.Row) -> Message:
+        return Message(id=row["id"], ticket_id=row["ticket_id"], user_ref=row["user_ref"],
+                       direction=row["direction"], author=row["author"], text=row["text"],
+                       created_at=row["created_at"])
+
+    def add_message(self, ticket_id: str, user_ref: str, direction: str, author: str, text: str) -> int:
+        """Дописать строку в ленту тикета. Возвращает id (монотонный курсор polling)."""
+        cur = self._conn.execute(
+            "INSERT INTO messages(ticket_id,user_ref,direction,author,text,created_at) VALUES(?,?,?,?,?,?)",
+            (ticket_id, user_ref, direction, author, text, time.time()))
+        self._conn.commit()
+        return cur.lastrowid or 0
+
+    def messages_since(self, user_ref: str, after_id: int, limit: int = 200) -> list[Message]:
+        """Все сообщения пользователя с id > after_id (по возрастанию). after_id=0 → вся лента (восстановление)."""
+        cur = self._conn.execute(
+            "SELECT * FROM messages WHERE user_ref=? AND id>? ORDER BY id LIMIT ?", (user_ref, after_id, limit))
+        return [self._message_row(r) for r in cur.fetchall()]

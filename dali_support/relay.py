@@ -46,15 +46,23 @@ class Relay:
             ticket.thread_id = thread_id
         await self._tg.send_to_topic(ticket.thread_id, self._header(msg) + msg.text)
         self._store.touch(ticket.ticket_id)
+        # В ленту (источник правды для polling виджета). Пишем ПОСЛЕ успешной отправки в топик.
+        mid = self._store.add_message(ticket.ticket_id, ticket.user_ref, "in",
+                                      msg.display_name or msg.user_ref, msg.text)
         _LOG.info("[ingress] ticket=%s thread=%s len=%dсимв", ticket.ticket_id, ticket.thread_id, len(msg.text))
-        return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id)
+        return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id, message_id=mid)
+
+    def messages_since(self, user_ref: str, after_id: int):
+        """Лента пользователя с id > after_id — для polling браузерного виджета (см. widget_api)."""
+        return self._store.messages_since(user_ref, after_id)
 
     async def on_operator_message(self, thread_id: int, text: str, operator: str) -> None:
-        """Ответ оператора из топика → callback продукту (тот доставит в живую сессию)."""
+        """Ответ оператора из топика → в ленту (виджет заберёт polling-ом) + опц. callback продукту."""
         ticket = self._store.get_by_thread(thread_id)
         if not ticket:
             _LOG.warning("[reply] ответ в неизвестном топике thread=%s — пропускаю", thread_id)
             return
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", operator or "Поддержка", text)
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
                                            ticket_id=ticket.ticket_id, text=text, operator=operator))
         self._store.touch(ticket.ticket_id)
@@ -66,6 +74,8 @@ class Relay:
             return
         if command == "/close":
             self._store.close(ticket.ticket_id)
+            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out",
+                                    operator or "Поддержка", "Обращение закрыто оператором.")
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
 
@@ -76,7 +86,13 @@ class Relay:
         return " · ".join(bits) + "\n"
 
     async def _dispatch(self, ev: OperatorEvent) -> None:
-        """Живая попытка доставки события продукту. Не доставлено (delivered=0 / сбой) → в outbox на повтор."""
+        """Живая попытка доставки события продукту. Не доставлено (delivered=0 / сбой) → в outbox на повтор.
+
+        Модель «прямой виджет» (callback_url не задан): продукту НЕ шлём — событие уже в ленте messages,
+        браузерный виджет заберёт его polling-ом (`/v1/widget/messages`). callback/outbox остаются для
+        модели «через продукт» (задан `SUPPORT_PRODUCT_CALLBACK_URL`) и не рвутся."""
+        if not self._callback_url:
+            return
         if await self._post_callback(ev):
             return
         self._store.enqueue_outbox(ev.ticket_id, ev.user_ref, ev.event, ev.text, ev.operator,

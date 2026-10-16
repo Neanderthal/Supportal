@@ -12,8 +12,12 @@ FastAPI-сервис (:8500): пользователь пишет из веб-п
 - `uv run pytest tests/ -q` (оффлайн) · `uv run ruff check .`
 
 ## Ключевые факты (не переоткрывать)
-- **Граница A-стиля:** relay не знает про Chainlit. Chainlit-специфика (server-push в сессию) — в ТОНКОМ
-  адаптере продукта (rca-chat), не здесь. Контракт = 3 HTTP-связки с HMAC (`docs/api.md`).
+- **Граница A-стиля:** relay не знает про продукт. Весь UI — встраиваемый бандл `dali_support/widget/`
+  (ванильный JS/CSS, ноль React/Chainlit); продукт лишь чеканит токен и вендорит бандл. Контракт — `docs/api.md`.
+- **Ревизия 2026-10-16 — браузерный виджет напрямую:** браузер ходит в relay по Bearer-токену
+  (`tokens.py`, `SUPPORT_WIDGET_SECRET`) на `/v1/widget/{send,messages}` (polling); лента — таблица
+  `messages` (store). Прежняя server-push/callback-модель (`/v1/messages`→callback→outbox) остаётся за
+  конфигом (`SUPPORT_PRODUCT_CALLBACK_URL`; пуст → `_dispatch` дормант). Спека §5/§8 (rca-stack).
 - **Telegram — long-polling, НЕ webhook:** только egress к api.telegram.org. ⚠️ на облаке Timeweb Telegram
   достижим по IPv6 — контейнеру нужен рабочий IPv6-egress (см. спеку §9).
 - **1 топик = 1 тикет пользователя** (forum-супергруппа; бот — админ с правом «Управление темами»).

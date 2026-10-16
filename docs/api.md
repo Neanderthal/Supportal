@@ -1,8 +1,27 @@
 # HTTP-контракт dali-support
 
-Три связки. Все тела подписываются HMAC-SHA256 заголовком `X-Dali-Signature` (сверка `hmac.compare_digest`).
+Два контура: **(A) браузерный виджет напрямую** (ревизия 2026-10-16, основной) и **(B) через продукт**
+(прежняя server-push-модель, остаётся за конфигом). Тела A подписаны Bearer-токеном; тела B — HMAC-SHA256
+заголовком `X-Dali-Signature` (`hmac.compare_digest`).
 
-## 1. Продукт → relay: `POST /v1/messages`
+## 0. Браузерный виджет → relay (контур A — основной)
+
+Публичны через Caddy (same-origin `/support-api/v1/widget/*` → strip-prefix → relay). Авторизация —
+`Authorization: Bearer <token>`, где токен чеканит продукт (`{user_ref, exp}`, подпись `SUPPORT_WIDGET_SECRET`;
+схема — `dali_support/tokens.py`). `user_ref` — из токена (сервер), не из тела → анти-спуфинг.
+
+**Отправка:** `POST /v1/widget/send`
+```json
+{"text": "Нет давления в контуре"}        →  {"ok": true, "message_id": 12}
+```
+**Опрос (polling):** `GET /v1/widget/messages?after=<id>`
+```json
+→ {"messages": [{"id": 12, "direction": "in|out", "author": "Оператор", "text": "…", "ts": 1.72e9}], "last_id": 12}
+```
+- Вся лента пользователя с `id > after` по возрастанию (`after=0` → восстановление). `last_id` — курсор след. опроса.
+- `401` — нет/просрочен/подделан токен. Пользователь видит только свою ленту (токен привязан к `user_ref`).
+
+## 1. Продукт → relay: `POST /v1/messages` (контур B)
 Секрет — `SUPPORT_INGRESS_SECRET`.
 ```json
 {
@@ -21,8 +40,10 @@
 ```
 `401` — неверная/отсутствующая подпись.
 
-## 2. Relay → продукт: callback на `SUPPORT_PRODUCT_CALLBACK_URL`
-Секрет — `SUPPORT_CALLBACK_SECRET`. Шлётся при ответе оператора и при закрытии тикета.
+## 2. Relay → продукт: callback на `SUPPORT_PRODUCT_CALLBACK_URL` (контур B — опционально)
+Секрет — `SUPPORT_CALLBACK_SECRET`. Шлётся при ответе оператора и при закрытии тикета, **только если задан**
+`SUPPORT_PRODUCT_CALLBACK_URL`. В контуре A (виджет) не задан → callback/outbox дормант (ответы забирает
+polling виджета из §0; лента `messages` — источник правды).
 ```json
 {
   "event": "message",
