@@ -38,6 +38,8 @@ def _rate_limited(user_ref: str) -> bool:
 
 class WidgetSend(BaseModel):
     text: str = Field(..., description="User text from the widget.")
+    context: dict = Field(default_factory=dict,
+                          description="Visitor context (url/title/custom); posted once into the topic when SUPPORT_VISITOR_CONTEXT is on.")
 
 
 def _auth(authorization: str, secret: str) -> str:
@@ -62,8 +64,10 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         if not text:
             raise HTTPException(status_code=400, detail="empty text")
         # display_name/meta are NOT taken from the browser (untrusted) — name = user_ref, product is set server-side.
+        # Visitor context is display-only and accepted only when the feature is on (relay caps/sanitizes it).
+        ctx = body.context if get_bool("SUPPORT_VISITOR_CONTEXT", False) else {}
         res = await relay.ingress(IngressMessage(user_ref=user_ref, text=text, display_name=user_ref,
-                                                 meta={"product": "supportal-widget"}))
+                                                 meta={"product": "supportal-widget"}, context=ctx))
         _LOG.info("[widget] send user=%s len=%dchars mid=%d", user_ref[:8], len(text), res.message_id)
         return {"ok": True, "message_id": res.message_id}
 

@@ -15,6 +15,10 @@ SUPPORT_RATE_LIMIT_WINDOW: 60     # window length, seconds
 SUPPORT_ATTACHMENTS: off
 SUPPORT_ATTACHMENTS_MAX_MB: 10    # max upload size, MB
 
+# Post a one-time "visitor context" block (page URL/title + any custom fields the page supplies via
+# window.supportalContext) into a newly created topic, so the operator sees where the user is. Default: off.
+SUPPORT_VISITOR_CONTEXT: off
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

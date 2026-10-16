@@ -50,6 +50,9 @@ class Relay:
             thread_id = await self._tg.ensure_topic(msg.display_name or msg.user_ref)
             self._store.attach_thread(ticket.ticket_id, thread_id)
             ticket.thread_id = thread_id
+            block = self._context_block(msg.context)   # one-time visitor context into the fresh topic
+            if block:
+                await self._tg.send_to_topic(thread_id, block)
         await self._tg.send_to_topic(ticket.thread_id, self._header(msg) + msg.text)
         self._store.touch(ticket.ticket_id)
         # Into the feed (the source of truth for widget polling). We write it AFTER a successful send to the topic.
@@ -159,6 +162,24 @@ class Relay:
         bits = [f"👤 {msg.display_name or msg.user_ref}"]
         bits += [f"{k}={msg.meta[k]}" for k in ("product", "page") if msg.meta.get(k)]
         return " · ".join(bits) + "\n"
+
+    def _context_block(self, context: dict) -> str | None:
+        """One-time, operator-facing visitor-context block for a new topic. Gated by SUPPORT_VISITOR_CONTEXT.
+
+        Display-only: capped field count/length and newlines stripped (it goes into a plain Telegram message).
+        Returns None when the feature is off or there's nothing to show.
+        """
+        if not get_bool("SUPPORT_VISITOR_CONTEXT", False) or not isinstance(context, dict) or not context:
+            return None
+        lines = ["🧭 Visitor context"]
+        for key, value in list(context.items())[:12]:
+            if value is None:
+                continue
+            k = str(key)[:40].replace("\n", " ").strip()
+            v = str(value)[:300].replace("\n", " ").strip()
+            if k and v:
+                lines.append(f"{k}: {v}")
+        return "\n".join(lines) if len(lines) > 1 else None
 
     async def _dispatch(self, ev: OperatorEvent) -> None:
         """A live attempt to deliver the event to the product. Not delivered (delivered=0 / failure) → into the outbox for retry.

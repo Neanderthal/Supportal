@@ -28,6 +28,9 @@ All notable changes to this project are documented here. The format is based on
   product via a `strings` object in `POST /support/config` (applied via textContent/setAttribute, not
   innerHTML). The server-generated ticket-closed notice is now the `SUPPORT_CLOSED_NOTICE` setting.
   The demo ships a sample (Spanish) localization.
+- Visitor context (`SUPPORT_VISITOR_CONTEXT`, default off): the widget sends page context (URL/title/
+  referrer + custom fields from `window.supportalContext`) and the relay posts a one-time "🧭 Visitor
+  context" block into a new topic for the operator (capped/sanitized, display-only). The demo shows it.
 
 ### Changed
 - Translated the whole project to English: the `docs/` design docs, all in‑code comments,

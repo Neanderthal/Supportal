@@ -32,6 +32,20 @@ Keys: `title`, `support` (launcher aria-label), `close`, `greeting`, `placeholde
 line is the ticket-closed notice — localize it with the `SUPPORT_CLOSED_NOTICE` setting (operator replies
 come from Telegram in the operator's own language).
 
+## Visitor context (feature `SUPPORT_VISITOR_CONTEXT`, default off)
+When on, the widget sends page context with the user's message and the relay posts a **one-time**
+"🧭 Visitor context" block into the topic as it is created (operator-facing; not shown in the user's feed).
+The widget always includes `url`, `title`, and `referrer`; the host can add **custom fields** by setting a
+global before the bundle loads:
+
+```html
+<script>window.supportalContext = { plan: "Pro", account: "acme-42" };</script>
+<script src="/support-widget.js"></script>
+```
+
+`/support/config` should report `"context": true` so the widget collects context only when the relay has
+the feature on. The values are display-only — the relay caps field count/length and strips newlines.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.
