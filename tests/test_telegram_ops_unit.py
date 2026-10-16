@@ -10,10 +10,36 @@ import asyncio
 import io
 from types import SimpleNamespace
 
-from supportal.telegram_ops import HELP_TEXT, MEDIA_FETCH_FAILED, TelegramOps, operator_name
+from supportal.telegram_ops import (
+    HELP_TEXT,
+    MEDIA_FETCH_FAILED,
+    OperatorCommand,
+    OperatorDelete,
+    OperatorEdit,
+    OperatorMediaReply,
+    OperatorReply,
+    TelegramOps,
+    operator_name,
+)
 
 _DUMMY_TOKEN = "123456:abc"      # valid by format; the network is not touched until a bot method is called
 _GROUP_ID = -1001234567890
+
+
+class _RecordingHandler:
+    """Captures the structured OperatorHandler events (the single object start_polling now takes)."""
+    def __init__(self) -> None:
+        self.messages: list = []
+        self.media: list = []
+        self.commands: list = []
+        self.edits: list = []
+        self.deletes: list = []
+
+    async def on_message(self, ev): self.messages.append(ev)
+    async def on_media(self, ev): self.media.append(ev)
+    async def on_command(self, ev): self.commands.append(ev)
+    async def on_edit(self, ev): self.edits.append(ev)
+    async def on_delete(self, ev): self.deletes.append(ev)
 
 
 class _FakeBot:
@@ -86,19 +112,14 @@ def test_start_polling_registers_handlers(monkeypatch):
 
     monkeypatch.setattr(tg._dp, "start_polling", _fake_poll)
 
-    async def _noop(*a):
-        return None
-
-    asyncio.run(tg.start_polling(_noop, _noop, _noop, _noop, _noop))
+    asyncio.run(tg.start_polling(_RecordingHandler()))
     # 3 message handlers (command+media+text) + 1 edited_message handler (edit-sync)
     assert captured == {"msg_handlers": 3, "edit_handlers": 1,
                         "handle_signals": False, "close_bot_session": False}
 
 
-def _handlers(tg, on_message, on_command, on_edit, on_delete):
-    async def _media(*a):
-        return None
-    tg._register_handlers(on_message, on_command, on_edit, on_delete, _media)
+def _handlers(tg, handler):
+    tg._register_handlers(handler)
     return (tg._dp.message.handlers[0].callback,      # [0] command
             tg._dp.message.handlers[2].callback,      # [2] text ([1] is media)
             tg._dp.edited_message.handlers[0].callback)  # edited_message
@@ -106,21 +127,8 @@ def _handlers(tg, on_message, on_command, on_edit, on_delete):
 
 def test_handlers_route_command_text_edit_delete():
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
-    seen = {"msg": [], "cmd": [], "edit": [], "del": []}
-
-    async def on_message(thread_id, text, operator, tg_message_id):
-        seen["msg"].append((thread_id, text, operator, tg_message_id))
-
-    async def on_command(thread_id, command, operator):
-        seen["cmd"].append((thread_id, command, operator))
-
-    async def on_edit(tg_message_id, text):
-        seen["edit"].append((tg_message_id, text))
-
-    async def on_delete(tg_message_id):
-        seen["del"].append(tg_message_id)
-
-    cmd_handler, text_handler, edit_handler = _handlers(tg, on_message, on_command, on_edit, on_delete)
+    h = _RecordingHandler()
+    cmd_handler, text_handler, edit_handler = _handlers(tg, h)
     user = SimpleNamespace(username="support1", full_name="Pyotr", id=7)
 
     # /close → on_command
@@ -142,10 +150,10 @@ def test_handlers_route_command_text_edit_delete():
     asyncio.run(edit_handler(SimpleNamespace(message_thread_id=55, from_user=user,
                                              text="check your notification settings and spam", message_id=42)))
 
-    assert seen["cmd"] == [(55, "/close", "support1")]
-    assert seen["msg"] == [(55, "check your notification settings", "support1", 99)]
-    assert seen["del"] == [42]                               # only a valid reply target
-    assert seen["edit"] == [(42, "check your notification settings and spam")]
+    assert h.commands == [OperatorCommand(55, "/close", "support1")]
+    assert h.messages == [OperatorReply(55, "check your notification settings", "support1", 99)]
+    assert h.deletes == [OperatorDelete(42)]                 # only a valid reply target
+    assert h.edits == [OperatorEdit(42, "check your notification settings and spam")]
 
 
 def test_clear_routes_to_command_and_help_posts_to_topic():
@@ -156,15 +164,8 @@ def test_clear_routes_to_command_and_help_posts_to_topic():
         sent.append((thread_id, text))
 
     tg.send_to_topic = _fake_send
-    cmds = []
-
-    async def on_command(thread_id, command, operator):
-        cmds.append((thread_id, command, operator))
-
-    async def _noop(*a):
-        return None
-
-    cmd_handler, _text, _edit = _handlers(tg, _noop, on_command, _noop, _noop)
+    h = _RecordingHandler()
+    cmd_handler, _text, _edit = _handlers(tg, h)
     user = SimpleNamespace(username="support1", full_name="Pyotr", id=7)
     # /clear → routed to on_command (like /close), the relay clears both sides itself
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/clear"),
@@ -178,7 +179,8 @@ def test_clear_routes_to_command_and_help_posts_to_topic():
     # /c with no arg → "/c" (the relay lists the keys)
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/c"),
                             command=SimpleNamespace(command="c", args=None)))
-    assert cmds == [(55, "/clear", "support1"), (55, "/c saludo", "support1"), (55, "/c", "support1")]
+    assert h.commands == [OperatorCommand(55, "/clear", "support1"), OperatorCommand(55, "/c saludo", "support1"),
+                          OperatorCommand(55, "/c", "support1")]
     assert sent == [(55, HELP_TEXT)]
 
 
@@ -196,22 +198,15 @@ def test_handle_media_download_failure_posts_operator_note():
 
     tg.send_to_topic = _fake_send
     tg._download = _boom
-    media_calls = []
-
-    async def on_media(*a):
-        media_calls.append(a)
-
-    async def _noop(*a):
-        return None
-
-    tg._register_handlers(_noop, _noop, _noop, _noop, on_media)
+    h = _RecordingHandler()
+    tg._register_handlers(h)
     media_handler = tg._dp.message.handlers[1].callback      # [1] is the media handler
     user = SimpleNamespace(username="support1", full_name="", id=1)
     doc = SimpleNamespace(file_id="F1", file_name="big.zip", mime_type="application/zip")
     msg = SimpleNamespace(message_thread_id=55, message_id=7, photo=None, document=doc, caption="", from_user=user)
 
     asyncio.run(media_handler(msg))                           # must not raise
-    assert media_calls == []                                  # media dropped, not relayed
+    assert h.media == []                                      # media dropped, not relayed
     assert notes == [(55, MEDIA_FETCH_FAILED)]                # operator told in the topic
 
 
@@ -242,15 +237,8 @@ def test_send_media_photo_vs_document_branching():
 
 def test_handle_media_photo_and_document_success():
     tg, _bot = _tg_with_fake_bot()
-    got = []
-
-    async def on_media(*a):
-        got.append(a)
-
-    async def _noop(*a):
-        return None
-
-    tg._register_handlers(_noop, _noop, _noop, _noop, on_media)
+    h = _RecordingHandler()
+    tg._register_handlers(h)
     media_handler = tg._dp.message.handlers[1].callback
     user = SimpleNamespace(username="support1", full_name="", id=1)
 
@@ -267,7 +255,7 @@ def test_handle_media_photo_and_document_success():
     none_msg = SimpleNamespace(message_thread_id=9, message_id=3, caption="", photo=None, document=None, from_user=user)
     asyncio.run(media_handler(none_msg))
 
-    assert len(got) == 2
-    # (thread_id, data, filename, mime, caption, operator, tg_message_id)
-    assert got[0] == (9, b"filebytes", "photo.jpg", "image/jpeg", "look", "support1", 1)
-    assert got[1] == (9, b"filebytes", "report.pdf", "application/pdf", "", "support1", 2)
+    assert h.media == [
+        OperatorMediaReply(9, b"filebytes", "photo.jpg", "image/jpeg", "look", "support1", 1),
+        OperatorMediaReply(9, b"filebytes", "report.pdf", "application/pdf", "", "support1", 2),
+    ]

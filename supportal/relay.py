@@ -14,7 +14,14 @@ from .hours import is_within
 from .models import IngressMessage, IngressResult, OperatorEvent
 from .settings import get, get_bool, get_dict
 from .store import Store
-from .telegram_ops import TelegramOps
+from .telegram_ops import (
+    OperatorCommand,
+    OperatorDelete,
+    OperatorEdit,
+    OperatorMediaReply,
+    OperatorReply,
+    TelegramOps,
+)
 
 _LOG = logging.getLogger("supportal.relay")
 
@@ -136,6 +143,25 @@ class Relay:
                              ticket.thread_id, exc_info=True)
         _LOG.info("[csat] ticket=%s score=%d comment=%s", ticket.ticket_id, score, "yes" if comment else "no")
         return mid
+
+    # ── OperatorHandler protocol (telegram_ops → relay): unpack the structured event into the domain call.
+    # One object is passed to TelegramOps.start_polling instead of five positional callbacks; the on_operator_*
+    # methods below hold the actual logic (and stay the direct, well-tested API).
+    async def on_message(self, ev: OperatorReply) -> None:
+        await self.on_operator_message(ev.thread_id, ev.text, ev.operator, ev.tg_message_id)
+
+    async def on_media(self, ev: OperatorMediaReply) -> None:
+        await self.on_operator_media(ev.thread_id, ev.data, ev.filename, ev.mime, ev.caption,
+                                     ev.operator, ev.tg_message_id)
+
+    async def on_command(self, ev: OperatorCommand) -> None:
+        await self.on_operator_command(ev.thread_id, ev.command, ev.operator)
+
+    async def on_edit(self, ev: OperatorEdit) -> None:
+        await self.on_operator_edit(ev.tg_message_id, ev.new_text)
+
+    async def on_delete(self, ev: OperatorDelete) -> None:
+        await self.on_operator_delete(ev.tg_message_id)
 
     async def on_operator_message(self, thread_id: int, text: str, operator: str,
                                   tg_message_id: int = 0) -> None:
