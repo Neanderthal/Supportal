@@ -130,3 +130,39 @@ def test_dispatch_failsoft_on_callback_error(monkeypatch):
     store.attach_thread(t.ticket_id, 11)
     # a callback failure must not propagate (the operator reply is lost, but the relay stays alive)
     asyncio.run(_relay(store).on_operator_message(11, "any text", "support1"))
+
+
+def test_operator_command_unknown_thread_noop(monkeypatch):
+    _FakeClient.posts.clear()
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+    # command in a thread with no ticket → get_by_thread None → no-op: no dispatch, no crash
+    asyncio.run(_relay(_store()).on_operator_command(12345, "/close", "support1"))
+    assert _FakeClient.posts == []
+
+
+class _RaisingTG:
+    """TelegramOps double whose delete_topic raises (operator bot lacks can_manage_topics)."""
+    async def ensure_topic(self, title: str) -> int:
+        return 1
+
+    async def send_to_topic(self, thread_id: int, text: str) -> None:
+        return None
+
+    async def delete_topic(self, thread_id: int) -> None:
+        raise RuntimeError("no can_manage_topics")
+
+    async def close(self) -> None:
+        return None
+
+
+def test_clear_failsoft_when_delete_topic_raises():
+    # /clear with a failing delete_topic must stay fail-soft: the feed is still cleared and the ticket reset
+    store = _store()
+    t = store.create("eng@x", "Ivanov")
+    store.attach_thread(t.ticket_id, 55)
+    store.add_message(t.ticket_id, "eng@x", "in", "Ivanov", "hi")
+    relay = Relay(store, _RaisingTG(), "", "")          # contour A (no callback) + raising delete_topic
+    asyncio.run(relay.on_operator_command(55, "/clear", "Operator"))
+    rows = store.changes_since("eng@x", 0)
+    assert rows and all(r.deleted for r in rows)        # feed cleared despite the delete_topic failure
+    assert store.get_open_by_user("eng@x") is None      # ticket reset
