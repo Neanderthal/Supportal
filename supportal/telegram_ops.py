@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Protocol
 
 _LOG = logging.getLogger("supportal.tg")
 
@@ -22,12 +23,54 @@ MEDIA_FETCH_FAILED = (
     "The user did NOT receive it — please resend a smaller file or share a link."
 )
 
-OnMessage = Callable[[int, str, str, int], Awaitable[None]]  # (thread_id, text, operator, tg_message_id) → None
-OnCommand = Callable[[int, str, str], Awaitable[None]]       # (thread_id, command, operator) → None
-OnEdit = Callable[[int, str], Awaitable[None]]               # (tg_message_id, new_text) → None
-OnDelete = Callable[[int], Awaitable[None]]                  # (tg_message_id) → None
-# (thread_id, data, filename, mime, caption, operator, tg_message_id) → None
-OnMedia = Callable[[int, bytes, str, str, str, str, int], Awaitable[None]]
+
+# ── Operator events (Telegram → consumer) ──────────────────────────────────────
+# One structured event per operator action instead of five positional callbacks (+ a 7-tuple). Adding a field
+# no longer ripples through positional signatures; a new capability is a new event + one handler method.
+@dataclass(frozen=True)
+class OperatorReply:
+    thread_id: int
+    text: str
+    operator: str
+    tg_message_id: int = 0
+
+
+@dataclass(frozen=True)
+class OperatorMediaReply:
+    thread_id: int
+    data: bytes
+    filename: str
+    mime: str
+    caption: str
+    operator: str
+    tg_message_id: int = 0
+
+
+@dataclass(frozen=True)
+class OperatorCommand:
+    thread_id: int
+    command: str          # e.g. "/close", "/clear", "/c <key>"
+    operator: str
+
+
+@dataclass(frozen=True)
+class OperatorEdit:
+    tg_message_id: int
+    new_text: str
+
+
+@dataclass(frozen=True)
+class OperatorDelete:
+    tg_message_id: int
+
+
+class OperatorHandler(Protocol):
+    """What TelegramOps calls back into (one object, not five callbacks). Relay implements it."""
+    async def on_message(self, ev: OperatorReply) -> None: ...
+    async def on_media(self, ev: OperatorMediaReply) -> None: ...
+    async def on_command(self, ev: OperatorCommand) -> None: ...
+    async def on_edit(self, ev: OperatorEdit) -> None: ...
+    async def on_delete(self, ev: OperatorDelete) -> None: ...
 
 # Operator commands in the topic: /close (close), /del (recall a message — as a reply), /clear (clear both
 # sides), /help (hint), /c <key> (canned reply), /ban — reserved. Telegram does NOT send bots deletion events → /del + edit-sync.
@@ -94,10 +137,9 @@ class TelegramOps:
         buf = await self._bot.download_file(file.file_path)
         return buf.read()
 
-    def _register_handlers(self, on_message: OnMessage, on_command: OnCommand,
-                           on_edit: OnEdit, on_delete: OnDelete, on_media: OnMedia) -> None:
-        """Supergroup topic handlers: /del → recall (on_delete), /close|/ban → on_command, text →
-        on_message, text EDITING → on_edit (edited_message).
+    def _register_handlers(self, handler: OperatorHandler) -> None:
+        """Supergroup topic handlers → structured events on `handler`: /del → on_delete, /close|/clear|/c|… →
+        on_command, text → on_message, text EDITING → on_edit (edited_message), photo/document → on_media.
 
         Filters: only OUR group (chat.id == group_id) and only INSIDE a topic (message_thread_id set).
         A command is caught before text; unknown "/…" are excluded from the text handler (they do not leak
@@ -117,7 +159,7 @@ class TelegramOps:
                 rt = message.reply_to_message
                 target = rt.message_id if (rt and not rt.forum_topic_created) else 0
                 if target:
-                    await on_delete(target)
+                    await handler.on_delete(OperatorDelete(target))
                     _LOG.info("[op] /del thread=%s target_msg=%s", message.message_thread_id, target)
                 else:
                     _LOG.info("[op] /del with no reply to a message thread=%s — ignored", message.message_thread_id)
@@ -129,21 +171,23 @@ class TelegramOps:
                 return
             if command.command == "c":
                 # Canned reply: "/c <key>" — forward the key as the command arg (the relay expands it).
-                await on_command(message.message_thread_id, f"/c {command.args or ''}".rstrip(),
-                                 operator_name(message.from_user))
+                await handler.on_command(OperatorCommand(message.message_thread_id,
+                                                         f"/c {command.args or ''}".rstrip(),
+                                                         operator_name(message.from_user)))
                 _LOG.info("[op] /c thread=%s", message.message_thread_id)
                 return
-            await on_command(message.message_thread_id, f"/{command.command}", operator_name(message.from_user))
+            await handler.on_command(OperatorCommand(message.message_thread_id, f"/{command.command}",
+                                                     operator_name(message.from_user)))
             _LOG.info("[op] command=/%s thread=%s", command.command, message.message_thread_id)
 
         async def _handle_text(message: Message) -> None:
-            await on_message(message.message_thread_id, message.text, operator_name(message.from_user),
-                             message.message_id)
+            await handler.on_message(OperatorReply(message.message_thread_id, message.text,
+                                                   operator_name(message.from_user), message.message_id))
             _LOG.info("[op] reply thread=%s msg=%s len=%dchars",
                       message.message_thread_id, message.message_id, len(message.text or ""))
 
         async def _handle_edit(message: Message) -> None:
-            await on_edit(message.message_id, message.text)
+            await handler.on_edit(OperatorEdit(message.message_id, message.text))
             _LOG.info("[op] edit thread=%s msg=%s len=%dchars",
                       message.message_thread_id, message.message_id, len(message.text or ""))
 
@@ -169,8 +213,9 @@ class TelegramOps:
                 with contextlib.suppress(Exception):
                     await self.send_to_topic(message.message_thread_id, MEDIA_FETCH_FAILED)
                 return
-            await on_media(message.message_thread_id, data, filename, mime, message.caption or "",
-                           operator_name(message.from_user), message.message_id)
+            await handler.on_media(OperatorMediaReply(message.message_thread_id, data, filename, mime,
+                                                      message.caption or "", operator_name(message.from_user),
+                                                      message.message_id))
             _LOG.info("[op] media thread=%s msg=%s mime=%s size=%d",
                       message.message_thread_id, message.message_id, mime, len(data))
 
@@ -179,16 +224,16 @@ class TelegramOps:
         self._dp.message.register(_handle_text, in_our_topic, F.text, ~F.text.startswith("/"))
         self._dp.edited_message.register(_handle_edit, in_our_topic, F.text, ~F.text.startswith("/"))
 
-    async def start_polling(self, on_message: OnMessage, on_command: OnCommand,
-                            on_edit: OnEdit, on_delete: OnDelete, on_media: OnMedia) -> None:
-        """Listen to operators via long-polling (getUpdates). Blocks until the task is cancelled. Registering the
-        edited_message handler → aiogram itself includes that update type in allowed_updates.
+    async def start_polling(self, handler: OperatorHandler) -> None:
+        """Listen to operators via long-polling (getUpdates), dispatching structured events to `handler`.
+        Blocks until the task is cancelled. Registering the edited_message handler → aiogram itself includes
+        that update type in allowed_updates.
 
         handle_signals=False — polling runs in uvicorn's event loop (not the main "signal" context),
         uvicorn installs its own signal handlers. close_bot_session=False — the bot session is closed by app
         (lifespan → TelegramOps.close), single ownership.
         """
-        self._register_handlers(on_message, on_command, on_edit, on_delete, on_media)
+        self._register_handlers(handler)
         _LOG.info("[tg] supergroup long-polling group_id=%s — start", self._group_id)
         await self._dp.start_polling(self._bot, handle_signals=False, close_bot_session=False)
 

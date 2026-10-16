@@ -44,6 +44,11 @@ All notable changes to this project are documented here. The format is based on
   env string); `settings.get_dict` added. Operator-side only (no widget surface); the demo ships Spanish presets.
 
 ### Changed
+- Refactored the operator-callback boundary (architecture review #7): `TelegramOps.start_polling` /
+  `_register_handlers` now take a single `OperatorHandler` object and emit **structured events**
+  (`OperatorReply`/`OperatorMediaReply`/`OperatorCommand`/`OperatorEdit`/`OperatorDelete`) instead of five
+  positional callbacks (incl. a 7-tuple media alias). `Relay` implements the protocol; the `on_operator_*`
+  domain methods are unchanged. Internal only — no change to the HTTP contract or widget.
 - Documented the **single-process invariant** (architecture review #3): the Telegram long-poller, the
   outbox-retry loop and the in-memory rate limiter are per-process singletons, so running
   `uvicorn --workers >1` or multiple replicas breaks delivery (409 Conflict, double outbox, per-worker

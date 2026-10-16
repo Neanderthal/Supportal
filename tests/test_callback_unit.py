@@ -166,3 +166,30 @@ def test_clear_failsoft_when_delete_topic_raises():
     rows = store.changes_since("eng@x", 0)
     assert rows and all(r.deleted for r in rows)        # feed cleared despite the delete_topic failure
     assert store.get_open_by_user("eng@x") is None      # ticket reset
+
+
+def test_relay_satisfies_operator_handler_protocol():
+    # arch review #7: TelegramOps now calls ONE handler with structured events; Relay's on_message/on_media/
+    # on_command/on_edit/on_delete unpack the event and delegate to the on_operator_* domain methods.
+    from supportal.telegram_ops import (
+        OperatorCommand,
+        OperatorDelete,
+        OperatorEdit,
+        OperatorMediaReply,
+        OperatorReply,
+    )
+    store = _store()
+    t = store.create("eng@x", "Ivanov")
+    store.attach_thread(t.ticket_id, 55)
+    relay = Relay(store, _FakeTG(), "", "")             # contour A (no product callback)
+
+    asyncio.run(relay.on_message(OperatorReply(55, "a reply", "support1", 777)))
+    assert store.changes_since("eng@x", 0)[-1].text == "a reply"       # → on_operator_message
+    asyncio.run(relay.on_edit(OperatorEdit(777, "edited reply")))
+    assert store.changes_since("eng@x", 0)[-1].text == "edited reply"  # → on_operator_edit
+    asyncio.run(relay.on_delete(OperatorDelete(777)))
+    assert store.changes_since("eng@x", 0)[-1].deleted is True         # → on_operator_delete
+    asyncio.run(relay.on_command(OperatorCommand(55, "/close", "support1")))
+    assert store.get_by_thread(55).status == "closed"                 # → on_operator_command
+    # on_media adapter delegates to on_operator_media (behavior gated by SUPPORT_ATTACHMENTS, tested elsewhere)
+    asyncio.run(relay.on_media(OperatorMediaReply(55, b"x", "f.bin", "application/octet-stream", "", "op", 0)))
