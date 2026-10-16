@@ -90,6 +90,10 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- `Store` now has a `close_connection()` lifecycle method, called from the app lifespan on shutdown
+  (`supportal/store.py`, `supportal/app.py`) — the SQLite connection was never released, so a long-running
+  process that recreated stores leaked connections (and tests showed `ResourceWarning: unclosed database`).
+  (Named `close_connection` to avoid colliding with the existing `close(ticket_id)`, which closes a ticket.)
 - Business-hours overnight windows now cover the early-morning tail correctly (`supportal/hours.py`): for a
   single-day window like `fri 22:00-02:00`, Saturday 01:00 was wrongly treated as closed because Saturday
   isn't in the schedule. The after-midnight tail is now attributed to the start day.

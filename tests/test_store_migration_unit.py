@@ -58,6 +58,14 @@ def test_store_rejects_non_sqlite_url():
         Store("postgresql://localhost/db")
 
 
+def test_close_connection_releases_the_sqlite_connection(tmp_path):
+    store = Store(f"sqlite:///{tmp_path / 'c.db'}")
+    store.bootstrap()
+    store.close_connection()
+    with pytest.raises(sqlite3.ProgrammingError):    # a closed connection can't be used
+        store.get_open_by_user("u")
+
+
 def test_changes_since_never_splits_a_single_seq_batch(tmp_path):
     # A /clear stamps the whole feed with ONE seq. A page smaller than the batch must still return the WHOLE
     # equal-seq group — otherwise the cursor (max seq) skips the rest next poll and bubbles survive /clear.

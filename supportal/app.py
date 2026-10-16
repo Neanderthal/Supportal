@@ -85,6 +85,7 @@ def create_app(config: Config | None = None) -> FastAPI:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
             await tg.close()
+            store.close_connection()
 
     # Feature SUPPORT_OPENAPI (default off): expose the Swagger UI (/docs), ReDoc (/redoc) and the schema
     # (/openapi.json). Off by default — the relay usually sits behind the product's reverse-proxy and the API
