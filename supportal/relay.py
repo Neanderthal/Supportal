@@ -5,10 +5,12 @@ product's HTTP callback. This keeps the service embeddable into any web product.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import logging
 import time
+from collections import defaultdict
 
 from .flags import Flags
 from .hours import is_within
@@ -53,18 +55,32 @@ class Relay:
         self._outbox_max_attempts = outbox_max_attempts
         self._backoff_base = outbox_backoff_base
         self._backoff_cap = outbox_backoff_cap
+        # Per-user lock serializing find-or-create of a ticket+topic. Without it, two concurrent first-contact
+        # requests from one user (two tabs / a retry / send+upload) both see "no topic yet" across the
+        # `await ensure_topic` and create TWO Telegram topics. One small lock per active user_ref (negligible).
+        self._ticket_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    async def _ensure_ticket(self, user_ref: str, display_name: str) -> tuple:
+        """The user's open ticket (creating it + its Telegram topic on first contact). Returns (ticket, is_new).
+
+        Serialized per user_ref so concurrent first-contacts don't create duplicate topics: the second caller
+        waits, then finds the ticket+topic the first one created (`is_new=False`)."""
+        async with self._ticket_locks[user_ref]:
+            ticket = self._store.get_open_by_user(user_ref) or self._store.create(user_ref, display_name)
+            is_new = ticket.thread_id is None
+            if is_new:
+                thread_id = await self._tg.ensure_topic(display_name or user_ref)
+                self._store.attach_thread(ticket.ticket_id, thread_id)
+                ticket.thread_id = thread_id
+            return ticket, is_new
 
     async def ingress(self, msg: IngressMessage) -> IngressResult:
         """A user's message → their forum topic (created on the first contact)."""
-        ticket = self._store.get_open_by_user(msg.user_ref) or self._store.create(msg.user_ref, msg.display_name)
-        is_new = ticket.thread_id is None
+        ticket, is_new = await self._ensure_ticket(msg.user_ref, msg.display_name)
         if is_new:
-            thread_id = await self._tg.ensure_topic(msg.display_name or msg.user_ref)
-            self._store.attach_thread(ticket.ticket_id, thread_id)
-            ticket.thread_id = thread_id
             block = self._context_block(msg.context)   # one-time visitor context into the fresh topic
             if block:
-                await self._tg.send_to_topic(thread_id, block)
+                await self._tg.send_to_topic(ticket.thread_id, block)
         await self._tg.send_to_topic(ticket.thread_id, self._header(msg) + msg.text)
         self._store.touch(ticket.ticket_id)
         # Into the feed (the source of truth for widget polling). We write it AFTER a successful send to the
@@ -100,11 +116,7 @@ class Relay:
     async def add_user_attachment(self, user_ref: str, display_name: str, data: bytes, filename: str,
                                   mime: str, caption: str = "") -> IngressResult:
         """A user's file from the widget → their forum topic (photo/document) + a feed row referencing it."""
-        ticket = self._store.get_open_by_user(user_ref) or self._store.create(user_ref, display_name)
-        if ticket.thread_id is None:
-            thread_id = await self._tg.ensure_topic(display_name or user_ref)
-            self._store.attach_thread(ticket.ticket_id, thread_id)
-            ticket.thread_id = thread_id
+        ticket, _is_new = await self._ensure_ticket(user_ref, display_name)
         await self._tg.send_media(ticket.thread_id, data, filename, mime, caption)
         self._store.touch(ticket.ticket_id)
         att_id = self._store.add_attachment(user_ref, "in", filename, mime, data)
