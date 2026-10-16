@@ -121,6 +121,9 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         """Feature SUPPORT_RECEIPTS: the widget reports it has seen the feed up to `seq`. The relay marks the
         operator's messages read (and reacts 👀 in Telegram). No-op/`seen:0` when the feature is off."""
         user_ref = _auth(authorization, widget_secret)
+        if _rate_limited(user_ref):   # a valid token could otherwise spam mark_read → DB + Telegram reactions
+            _LOG.warning("[widget] rate-limited (read) user=%s", user_ref[:8])
+            raise HTTPException(status_code=429, detail="rate limited")
         seen = await relay.mark_read(user_ref, body.seq)
         return {"ok": True, "seen": seen}
 
