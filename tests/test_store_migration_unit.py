@@ -56,3 +56,43 @@ def test_bootstrap_is_idempotent_on_migrated_db(tmp_path):
 def test_store_rejects_non_sqlite_url():
     with pytest.raises(NotImplementedError):
         Store("postgresql://localhost/db")
+
+
+# ── atomic seq counter + WAL (arch review #1/#2) ───────────────────────────────
+def test_bootstrap_enables_wal_and_seeds_seq_counter(tmp_path):
+    store = Store(f"sqlite:///{tmp_path / 'fresh.db'}")
+    store.bootstrap()
+    assert store._conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    assert store._conn.execute("SELECT v FROM seq_counter").fetchone()[0] == 0   # empty feed → 0
+
+
+def test_seq_is_atomic_monotonic_and_unique(tmp_path):
+    store = Store(f"sqlite:///{tmp_path / 'fresh.db'}")
+    store.bootstrap()
+    t = store.create("u1", "U1")
+    for i in range(5):
+        store.add_message(t.ticket_id, "u1", "in", "U1", f"m{i}")
+    seqs = [r.seq for r in store.changes_since("u1", 0)]
+    assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)                  # strictly increasing, unique
+    assert store._conn.execute("SELECT v FROM seq_counter").fetchone()[0] == max(seqs)
+    # /clear bumps the counter once and stamps the whole batch with that single seq
+    before = max(seqs)
+    store.clear_messages("u1")
+    assert store._conn.execute("SELECT v FROM seq_counter").fetchone()[0] == before + 1
+    cleared = store.changes_since("u1", before)
+    assert cleared and len({r.seq for r in cleared}) == 1 and all(r.deleted for r in cleared)
+
+
+def test_seq_counter_seeded_from_existing_max_on_upgrade(tmp_path):
+    # a DB that already has messages+seq but no seq_counter (pre-upgrade) → counter seeds to max, not 0
+    path = tmp_path / "pre.db"
+    con = sqlite3.connect(str(path))
+    con.execute("""CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id TEXT, user_ref TEXT,
+                       direction TEXT, author TEXT DEFAULT '', text TEXT DEFAULT '', created_at REAL,
+                       tg_message_id INTEGER, deleted INTEGER DEFAULT 0, seq INTEGER, kind TEXT DEFAULT 'msg')""")
+    con.execute("INSERT INTO messages(ticket_id,user_ref,direction,created_at,seq) VALUES('t','u','in',1.0,7)")
+    con.commit(); con.close()
+    store = Store(f"sqlite:///{path}"); store.bootstrap()
+    assert store._conn.execute("SELECT v FROM seq_counter").fetchone()[0] == 7   # seeded from max(seq)
+    store.add_message("t", "u", "out", "Operator", "next")
+    assert store.changes_since("u", 7)[0].seq == 8                               # continues above the max

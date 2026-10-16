@@ -2,6 +2,14 @@
 
 Default — local SQLite (zero infrastructure, the project is self-contained). For a multi-user setup
 swap in Postgres (same interface/schema) — see docs/integration.md.
+
+Concurrency (arch review #1/#2): today every method runs synchronously on the one asyncio event loop
+(see supportal/app.py — single process), so there is no interleaving. The DB is nonetheless hardened so
+that moving DB work off the loop later stays safe: `seq` is bumped atomically in a single statement
+(`seq_counter` + `UPDATE … RETURNING`, no read-then-insert race), and the connection runs in WAL mode with
+a `busy_timeout` (readers don't block the single writer; contending writers wait rather than error). The
+remaining lever for heavy attachment BLOBs — moving those reads/writes off the loop onto a thread with its
+own connection — is deferred until attachment volume justifies it.
 """
 from __future__ import annotations
 
@@ -77,6 +85,11 @@ class Store:
         self._path = db_url[len("sqlite:///"):]
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        # WAL + busy_timeout (arch review #1/#2): readers don't block the single writer, and a contending
+        # writer waits up to the timeout instead of raising "database is locked". Harmless for the current
+        # single-connection use; the safe foundation for moving DB work off the event loop later.
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
 
     def bootstrap(self) -> None:
         self._conn.execute(
@@ -140,6 +153,13 @@ class Store:
         # polling follows seq (insert+edit+delete) + we look up the row by tg_message_id on edit/del
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_seq ON messages(user_ref, seq)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_tg ON messages(tg_message_id)")
+        # seq_counter — single-row atomic source for messages.seq (arch review #1). _next_seq() bumps it in
+        # ONE statement (UPDATE … RETURNING), replacing the old SELECT MAX(seq)+1 read-then-insert that could
+        # hand two writers the same value. Seeded ONCE from the current max seq so existing poll cursors stay
+        # valid and monotonic (and legacy DBs migrated above carry seq=id).
+        self._conn.execute("CREATE TABLE IF NOT EXISTS seq_counter (v INTEGER NOT NULL)")
+        if self._conn.execute("SELECT count(*) FROM seq_counter").fetchone()[0] == 0:
+            self._conn.execute("INSERT INTO seq_counter(v) SELECT COALESCE(MAX(seq),0) FROM messages")
         # attachments — file bytes (feature SUPPORT_ATTACHMENTS). Kept in the DB (one volume = the DB),
         # bounded by a size cap at the upload boundary. Referenced from messages.attachment_id.
         self._conn.execute(
@@ -252,8 +272,13 @@ class Store:
                        attachment_mime=(row["attachment_mime"] or "") if "attachment_mime" in keys else "")
 
     def _next_seq(self) -> int:
-        """Monotonic change cursor: max(seq)+1. A single writer (SQLite serializes) → no races."""
-        return (self._conn.execute("SELECT COALESCE(MAX(seq),0)+1 FROM messages").fetchone()[0])
+        """Next monotonic change cursor, bumped ATOMICALLY in one statement (`UPDATE … RETURNING`).
+
+        The counter lives in its own single-row table, so the read and the increment happen inside one SQL
+        statement — two writers can never be handed the same `seq` (the old `SELECT MAX(seq)+1` then INSERT
+        could). Correct even if DB work later moves off the event loop. One bump per feed operation (insert /
+        edit / delete / the whole /clear batch), so seq semantics are unchanged."""
+        return self._conn.execute("UPDATE seq_counter SET v = v + 1 RETURNING v").fetchone()[0]
 
     def add_message(self, ticket_id: str, user_ref: str, direction: str, author: str, text: str,
                     tg_message_id: int = 0, attachment_id: int | None = None, kind: str = "msg") -> int:
