@@ -9,9 +9,9 @@ Relay не зависит от продукта. Встраивающая сто
 3. **Личность:** `user_ref` — стабильный ключ (нормализованный логин). Один ключ на пользователя во всех
    вкладках/сессиях, иначе ответы разъедутся.
 
-Конкретный адаптер для Chainlit-чата ДаЛи (server-push в сессию через `init_ws_context` + `cl.Message`,
-реестр `user_ref → session_id`, фолбэк по истёкшей сессии) — в rca-stack:
-`docs/architecture/support-relay-plan.md` §8.
+Обзор типового адаптера (server-push в живую сессию, реестр `user_ref → session_id`, фолбэк по истёкшей
+сессии) — в спеке [support-relay-plan.md](support-relay-plan.md) §8; сам код адаптера пишется на стороне
+конкретного продукта.
 
 ## Настройка Telegram-стороны (один раз)
 1. Создать бота у @BotFather → `SUPPORT_TG_BOT_TOKEN`.
@@ -29,7 +29,7 @@ Relay не зависит от продукта. Встраивающая сто
 ## Развёртывание рядом с продуктом
 - Co-location: сервис в compose продукта, той же docker-сети. Ingress и callback ходят по внутренним
   именам (`http://dali-support:8500`, `http://<продукт>/…/push`). Публичных маршрутов добавлять не нужно.
-- Telegram — egress long-polling. ⚠️ На облаке Timeweb `api.telegram.org` достижим **только по IPv6**, а
-  docker-сеть обычно без IPv6. Два пути: (а) включить IPv6-egress контейнеру; (б) **`SUPPORT_TG_PROXY`** —
-  HTTP CONNECT forward-proxy на внешнем хосте с IPv4-egress к Telegram (напр. мониторинг-хост в ЕС).
-  Прокси лочится по IP релея + auth + только CONNECT:443 к `api.telegram.org`. См. спеку §9.
+- Telegram — egress long-polling. ⚠️ В некоторых сетях/облаках `api.telegram.org` достижим **только по
+  IPv6**, а docker-сеть обычно без IPv6. Два пути: (а) включить IPv6-egress контейнеру; (б) **`SUPPORT_TG_PROXY`** —
+  HTTP CONNECT forward-proxy на внешнем хосте с IPv4-egress к Telegram. Прокси стоит залочить по IP релея +
+  auth + только CONNECT:443 к `api.telegram.org`. См. спеку §9.

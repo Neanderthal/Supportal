@@ -44,7 +44,7 @@ class Message:
     ticket_id: str
     user_ref: str
     direction: str       # in (пользователь → оператор) | out (оператор/система → пользователь)
-    author: str          # кто написал (для показа): имя пользователя / оператора / «Система»
+    author: str          # кто написал (для показа): имя пользователя (in) или «Оператор» (out)
     text: str
     created_at: float
     tg_message_id: int = 0   # message_id в Telegram (для edit-sync и /del; 0 — не из топика)
@@ -89,9 +89,10 @@ class Store:
                    next_attempt_at REAL NOT NULL)""")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_outbox_due ON outbox(status, next_attempt_at)")
         # messages — лента переписки (обе стороны). Источник правды для polling браузерного виджета
-        # (GET /v1/widget/messages?after=<id>) и восстановления при перезагрузке. Монотонный AUTOINCREMENT
-        # id = курсор polling (виджет шлёт последний виденный id). Персистентна → переживает рестарт и
-        # оффлайн-пользователя (ответ оператора не теряется: подтянется при следующем опросе).
+        # (GET /v1/widget/messages?since=<seq>) и восстановления при перезагрузке. Монотонный `seq`
+        # (растёт на insert/edit/delete) = курсор polling (виджет шлёт последний виденный seq → правки и
+        # удаления старых строк тоже доходят). Персистентна → переживает рестарт и оффлайн-пользователя
+        # (ответ оператора не теряется: подтянется при следующем опросе).
         self._conn.execute(
             """CREATE TABLE IF NOT EXISTS messages (
                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
