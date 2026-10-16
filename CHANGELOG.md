@@ -53,6 +53,12 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- Made the `messages.seq` change-cursor **atomic** and hardened the SQLite connection (architecture review
+  #1/#2): `seq` is now bumped in one statement via a single-row `seq_counter` (`UPDATE … RETURNING`),
+  replacing the `SELECT MAX(seq)+1`-then-insert that could hand two writers the same value (silently
+  skipping a widget poll cursor) the moment DB work moved off the event loop. The connection runs in **WAL**
+  mode with a `busy_timeout`, and the misleading "single writer → no races" comment is corrected. Existing
+  DBs seed the counter from their current max seq on startup, so poll cursors stay valid (`supportal/store.py`).
 - Operator media that can't be fetched no longer vanishes silently (architecture review #6): a failed
   `getFile`/download (commonly a file above the Bot API's 20 MB limit) is now logged and the operator is
   told in the topic that the user received nothing (`MEDIA_FETCH_FAILED`), instead of dropping the file
