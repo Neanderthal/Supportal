@@ -20,6 +20,10 @@ All notable changes to this project are documented here. The format is based on
   `supportal/settings.py`. All optional features are off by default and gated by a flag.
 - Rate limiting on `POST /v1/widget/send` (`SUPPORT_RATE_LIMIT`, default off) — a
   per-`user_ref` sliding window (`supportal/ratelimit.py`).
+- File attachments both ways (`SUPPORT_ATTACHMENTS`, default off): widget upload
+  (`POST /v1/widget/upload`) + inline image / download-link rendering; operator photos and
+  documents from the topic are downloaded and relayed to the widget; bytes stored in the DB
+  (`attachments` table), size-capped by `SUPPORT_ATTACHMENTS_MAX_MB`. The demo shows both directions.
 
 ### Changed
 - Translated the whole project to English: the `docs/` design docs, all in‑code comments,

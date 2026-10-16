@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from .models import IngressMessage, WidgetMessage, WidgetPoll
@@ -72,8 +72,44 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         user_ref = _auth(authorization, widget_secret)
         rows = relay.changes_since(user_ref, since)   # new + edited + deleted (seq cursor)
         items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
-                               ts=m.created_at, deleted=m.deleted) for m in rows]
+                               ts=m.created_at, deleted=m.deleted, attachment_id=m.attachment_id,
+                               attachment_name=m.attachment_name, attachment_mime=m.attachment_mime)
+                 for m in rows]
         cursor = rows[-1].seq if rows else since
         return WidgetPoll(messages=items, cursor=cursor)
+
+    @router.post("/upload")
+    async def upload(request: Request, name: str = "", authorization: str = Header("")) -> dict:
+        """Feature SUPPORT_ATTACHMENTS: raw-body file upload (no multipart). Content-Type → mime, ?name= → filename."""
+        user_ref = _auth(authorization, widget_secret)
+        if not get_bool("SUPPORT_ATTACHMENTS", False):
+            raise HTTPException(status_code=404, detail="attachments disabled")
+        if _rate_limited(user_ref):
+            _LOG.warning("[widget] rate-limited (upload) user=%s", user_ref[:8])
+            raise HTTPException(status_code=429, detail="rate limited")
+        data = await request.body()
+        if not data:
+            raise HTTPException(status_code=400, detail="empty file")
+        max_bytes = get_int("SUPPORT_ATTACHMENTS_MAX_MB", 10) * 1024 * 1024
+        if len(data) > max_bytes:
+            raise HTTPException(status_code=413, detail="file too large")
+        mime = (request.headers.get("content-type") or "application/octet-stream").split(";")[0].strip()
+        res = await relay.add_user_attachment(user_ref, user_ref, data, name or "file", mime, "")
+        _LOG.info("[widget] upload user=%s mime=%s size=%d mid=%d", user_ref[:8], mime, len(data), res.message_id)
+        return {"ok": True, "message_id": res.message_id, "attachment_id": res.attachment_id}
+
+    @router.get("/attachment/{attachment_id}")
+    async def attachment(attachment_id: int, authorization: str = Header("")) -> Response:
+        """Serve attachment bytes to the browser. Bearer-gated + ownership check (own user_ref only)."""
+        user_ref = _auth(authorization, widget_secret)
+        if not get_bool("SUPPORT_ATTACHMENTS", False):
+            raise HTTPException(status_code=404, detail="attachments disabled")
+        att = relay.get_attachment(attachment_id)
+        if not att or att.user_ref != user_ref:
+            raise HTTPException(status_code=404, detail="not found")
+        headers = {}
+        if not (att.mime or "").startswith("image/"):
+            headers["Content-Disposition"] = f'attachment; filename="{att.filename}"'
+        return Response(content=att.data, media_type=att.mime or "application/octet-stream", headers=headers)
 
     return router

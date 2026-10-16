@@ -58,6 +58,17 @@
     }).catch(function () { return null; });
   }
 
+  // Raw-body upload (no multipart): Content-Type → mime, ?name= → filename. Feature SUPPORT_ATTACHMENTS.
+  function uploadFile(file, retried) {
+    return fetch(apiUrl("/v1/widget/upload?name=" + encodeURIComponent(file.name || "file")), {
+      method: "POST", headers: authHeaders({ "Content-Type": file.type || "application/octet-stream" }),
+      body: file
+    }).then(function (r) {
+      if (r.status === 401 && !retried) return refreshToken().then(function (ok) { return ok ? uploadFile(file, true) : null; });
+      return r.ok ? r.json() : null;
+    }).catch(function () { return null; });
+  }
+
   function pollOnce(retried) {
     if (!cfg) return Promise.resolve();
     return fetch(apiUrl("/v1/widget/messages?since=" + lastSeq), { headers: authHeaders() })
@@ -117,9 +128,50 @@
     var bub = document.createElement("div");
     bub.className = "supportal-bubble";
     bub.textContent = m.text || "";          // IMPORTANT: text from Telegram → textContent only
+    if (!m.text && !m.attachment_id) bub.style.display = "none";  // empty bubble (attachment-only handled below)
     row.appendChild(bub);
     els.list.appendChild(row);
     bubbles[m.id] = bub;                     // for later edit/del by id
+    if (m.attachment_id) loadAttachment(bub, m);
+  }
+
+  // Fetch attachment bytes with the Bearer token (an <img src> can't send headers), then render inline
+  // for images or as a download link otherwise. The bytes stay on the relay; we only proxy them here.
+  function loadAttachment(bub, m) {
+    bub.style.display = "";
+    fetch(apiUrl("/v1/widget/attachment/" + m.attachment_id), { headers: authHeaders() })
+      .then(function (r) { return r.ok ? r.blob() : null; })
+      .then(function (blob) {
+        if (!blob) return;
+        var url = URL.createObjectURL(blob);
+        var mime = m.attachment_mime || blob.type || "";
+        if (mime.indexOf("image/") === 0) {
+          var img = document.createElement("img");
+          img.className = "supportal-media";
+          img.alt = m.attachment_name || "image";
+          img.src = url;
+          img.addEventListener("click", function () { window.open(url, "_blank"); });
+          bub.appendChild(img);
+        } else {
+          var a = document.createElement("a");
+          a.className = "supportal-file";
+          a.href = url; a.download = m.attachment_name || "file";
+          a.textContent = "📎 " + (m.attachment_name || "file");
+          bub.appendChild(a);
+        }
+        if (isOpen) scrollToBottom();
+      }).catch(function () { /* ignore — a transient fetch failure */ });
+  }
+
+  function onFilePicked(e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = "";                      // allow re-picking the same file
+    if (!file) return;
+    renderNote("📤 Uploading " + file.name + "…");
+    uploadFile(file).then(function (res) {
+      if (res && res.message_id) pollOnce();  // pull the new attachment message in promptly
+      else renderNote("⚠️ Couldn't upload the file.");
+    });
   }
 
   function updateBubble(id, text) {
@@ -193,6 +245,9 @@
   var CHAT_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"'
     + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2'
     + ' 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  var CLIP_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"'
+    + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0'
+    + ' 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
 
   function build() {
     var root = document.createElement("div");
@@ -205,7 +260,10 @@
       + '    <button class="supportal-drawer-close" type="button" aria-label="Close">&times;</button></header>'
       + '  <div class="supportal-msg-list"><div class="supportal-greeting">Describe your question — a support operator will reply.'
       + ' The reply will arrive here; you don\'t have to wait on the page.</div></div>'
-      + '  <form class="supportal-composer"><textarea rows="1" placeholder="Message…" class="supportal-input"></textarea>'
+      + '  <form class="supportal-composer">'
+      + '    <button type="button" class="supportal-attach" aria-label="Attach a file">' + CLIP_ICON + '</button>'
+      + '    <input type="file" class="supportal-file-input" hidden>'
+      + '    <textarea rows="1" placeholder="Message…" class="supportal-input"></textarea>'
       + '    <button type="submit" class="supportal-send" aria-label="Send">'
       + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"'
       + ' stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/>'
@@ -220,6 +278,13 @@
     els.greeting = root.querySelector(".supportal-greeting");
     els.input = root.querySelector(".supportal-input");
     els.form = root.querySelector(".supportal-composer");
+    els.attach = root.querySelector(".supportal-attach");
+    els.fileInput = root.querySelector(".supportal-file-input");
+
+    // Attachments are a feature flag: the product's /support/config reports whether the relay has it on.
+    if (!(cfg && cfg.attachments)) { els.attach.style.display = "none"; }
+    els.attach.addEventListener("click", function () { els.fileInput.click(); });
+    els.fileInput.addEventListener("change", onFilePicked);
 
     els.fab.addEventListener("click", function () { setOpen(!isOpen); });
     root.querySelector(".supportal-drawer-close").addEventListener("click", function () { setOpen(false); });

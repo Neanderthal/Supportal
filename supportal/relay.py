@@ -11,6 +11,7 @@ import logging
 import time
 
 from .models import IngressMessage, IngressResult, OperatorEvent
+from .settings import get_bool
 from .store import Store
 from .telegram_ops import TelegramOps
 
@@ -57,9 +58,31 @@ class Relay:
         _LOG.info("[ingress] ticket=%s thread=%s len=%dchars", ticket.ticket_id, ticket.thread_id, len(msg.text))
         return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id, message_id=mid)
 
+    async def add_user_attachment(self, user_ref: str, display_name: str, data: bytes, filename: str,
+                                  mime: str, caption: str = "") -> IngressResult:
+        """A user's file from the widget → their forum topic (photo/document) + a feed row referencing it."""
+        ticket = self._store.get_open_by_user(user_ref) or self._store.create(user_ref, display_name)
+        if ticket.thread_id is None:
+            thread_id = await self._tg.ensure_topic(display_name or user_ref)
+            self._store.attach_thread(ticket.ticket_id, thread_id)
+            ticket.thread_id = thread_id
+        await self._tg.send_media(ticket.thread_id, data, filename, mime, caption)
+        self._store.touch(ticket.ticket_id)
+        att_id = self._store.add_attachment(user_ref, "in", filename, mime, data)
+        mid = self._store.add_message(ticket.ticket_id, user_ref, "in", display_name or user_ref, caption,
+                                      attachment_id=att_id)
+        _LOG.info("[ingress] attachment ticket=%s thread=%s mime=%s size=%d",
+                  ticket.ticket_id, ticket.thread_id, mime, len(data))
+        return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id,
+                             message_id=mid, attachment_id=att_id)
+
     def changes_since(self, user_ref: str, after_seq: int):
         """Changes to the user's feed with seq > after_seq (new/edited/deleted) — widget polling."""
         return self._store.changes_since(user_ref, after_seq)
+
+    def get_attachment(self, attachment_id: int):
+        """Fetch a stored attachment (bytes + metadata) for serving to the browser."""
+        return self._store.get_attachment(attachment_id)
 
     async def on_operator_message(self, thread_id: int, text: str, operator: str,
                                   tg_message_id: int = 0) -> None:
@@ -76,6 +99,24 @@ class Relay:
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
                                            ticket_id=ticket.ticket_id, text=text, operator=operator))
         self._store.touch(ticket.ticket_id)
+
+    async def on_operator_media(self, thread_id: int, data: bytes, filename: str, mime: str,
+                                caption: str, operator: str, tg_message_id: int = 0) -> None:
+        """An operator photo/document from the topic → store the file + a feed row. Gated by SUPPORT_ATTACHMENTS."""
+        if not get_bool("SUPPORT_ATTACHMENTS", False):
+            _LOG.info("[media] attachments disabled — ignoring operator media thread=%s", thread_id)
+            return
+        ticket = self._store.get_by_thread(thread_id)
+        if not ticket:
+            _LOG.warning("[media] media in an unknown topic thread=%s — skipping", thread_id)
+            return
+        att_id = self._store.add_attachment(ticket.user_ref, "out", filename, mime, data)
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, caption,
+                                tg_message_id=tg_message_id, attachment_id=att_id)
+        await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref, ticket_id=ticket.ticket_id,
+                                           text=caption or f"📎 {filename}", operator=operator))
+        self._store.touch(ticket.ticket_id)
+        _LOG.info("[media] operator attachment ticket=%s mime=%s size=%d", ticket.ticket_id, mime, len(data))
 
     async def on_operator_edit(self, tg_message_id: int, new_text: str) -> None:
         """The operator edited their message in Telegram (edited_message) → update the feed row."""

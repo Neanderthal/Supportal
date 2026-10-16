@@ -9,3 +9,8 @@
 SUPPORT_RATE_LIMIT: off
 SUPPORT_RATE_LIMIT_MAX: 20        # messages allowed within the window
 SUPPORT_RATE_LIMIT_WINDOW: 60     # window length, seconds
+
+# File attachments both ways (images rendered inline, other files as download links). Bytes are
+# stored in the DB, bounded by the size cap. Default: off.
+SUPPORT_ATTACHMENTS: off
+SUPPORT_ATTACHMENTS_MAX_MB: 10    # max upload size, MB

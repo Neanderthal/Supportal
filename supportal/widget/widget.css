@@ -70,10 +70,26 @@
 .supportal-out .supportal-bubble { background: hsl(var(--ds-muted)); color: hsl(var(--ds-fg)); border-bottom-left-radius: 4px; }
 .supportal-note { align-self: center; color: hsl(var(--ds-muted-fg)); font-size: 0.8rem; font-style: italic; margin: 0.2rem 0; }
 
+/* Attachments (feature SUPPORT_ATTACHMENTS): inline image / file link inside a bubble. */
+.supportal-media {
+  display: block; margin-top: 0.35rem; max-width: 100%; max-height: 260px;
+  border-radius: 0.4rem; cursor: zoom-in;
+}
+.supportal-bubble:empty { padding: 0; }
+.supportal-file {
+  display: inline-block; margin-top: 0.2rem; color: inherit; text-decoration: underline;
+  font-size: 0.85rem; word-break: break-all;
+}
+
 .supportal-composer {
   display: flex; align-items: flex-end; gap: 0.4rem; padding: 0.6rem;
   border-top: 1px solid hsl(var(--ds-border)); flex: 0 0 auto;
 }
+.supportal-attach {
+  flex: 0 0 auto; width: 34px; height: 38px; border: none; background: transparent; cursor: pointer;
+  color: hsl(var(--ds-muted-fg)); display: flex; align-items: center; justify-content: center;
+}
+.supportal-attach:hover { color: hsl(var(--ds-fg)); }
 .supportal-input {
   flex: 1 1 auto; resize: none; max-height: 120px; padding: 0.5rem 0.6rem;
   border: 1px solid hsl(var(--ds-border)); border-radius: var(--ds-radius);
