@@ -67,7 +67,7 @@ Secret — `SUPPORT_INGRESS_SECRET`.
 }
 ```
 - `user_ref` — a stable opaque user id (e.g. a normalized login `strip+lower`). The ticket key.
-- `meta` — shown to the operator in the topic header; the relay does not interpret it.
+- `meta` — shown to the operator in the topic header: `product` and `page` are rendered into the header line; any other keys are carried but not interpreted.
 
 Response `200`:
 ```json

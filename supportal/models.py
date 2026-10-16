@@ -10,7 +10,7 @@ class IngressMessage(BaseModel):
     user_ref: str = Field(..., description="Stable opaque user id (e.g. a normalized login). The ticket key.")
     text: str = Field(..., description="User text.")
     display_name: str = Field("", description="Human-readable name — goes into the topic title/header (not a secret).")
-    meta: dict = Field(default_factory=dict, description="Extra context for the operator (product, page) — displayed, not parsed.")
+    meta: dict = Field(default_factory=dict, description="Extra context for the operator. `product` and `page` are surfaced in the topic header; any other keys are carried but not interpreted.")
     context: dict = Field(default_factory=dict, description="Visitor context (url/title/custom) posted once into the topic on creation; display-only.")
 
 

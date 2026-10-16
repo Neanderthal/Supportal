@@ -48,6 +48,12 @@ All notable changes to this project are documented here. The format is based on
   Needs `receipts:true` in `/support/config`; the demo shows it (mock console renders `✓✓ seen`).
 
 ### Changed
+- Smaller architecture-review cleanups (#8): added `supportal/flags.py` — feature-flag/setting **names** as
+  constants (`Flags.ATTACHMENTS`, …) so a typo is an `AttributeError`, not a silent fall-back to the default;
+  adopted them in `relay.py`/`widget_api.py`. Aligned the `meta` docstring/`docs/api.md` with reality
+  (`product`/`page` ARE surfaced in the topic header; other keys are carried, not interpreted). Documented why
+  ingress records the feed row **after** the topic send, and that `config.py` (not the `Relay.__init__`
+  defaults) is the source of truth for the outbox numbers.
 - Refactored the operator-callback boundary (architecture review #7): `TelegramOps.start_polling` /
   `_register_handlers` now take a single `OperatorHandler` object and emit **structured events**
   (`OperatorReply`/`OperatorMediaReply`/`OperatorCommand`/`OperatorEdit`/`OperatorDelete`) instead of five
