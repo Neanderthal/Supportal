@@ -1,29 +1,29 @@
-"""DTO HTTP-контракта supportal. Это и есть граница встраивания — продукт знает только эти формы."""
+"""supportal HTTP-contract DTOs. This is the embedding boundary — the product only knows these shapes."""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 
 class IngressMessage(BaseModel):
-    """Продукт → relay: сообщение пользователя в поддержку."""
+    """Product → relay: a user's message to support."""
 
-    user_ref: str = Field(..., description="Стабильный непрозрачный id пользователя (например, нормализованный логин). Ключ тикета.")
-    text: str = Field(..., description="Текст пользователя.")
-    display_name: str = Field("", description="Человекочитаемое имя — в заголовок топика/шапку (не секрет).")
-    meta: dict = Field(default_factory=dict, description="Доп. контекст оператору (продукт, страница) — показывается, не парсится.")
+    user_ref: str = Field(..., description="Stable opaque user id (e.g. a normalized login). The ticket key.")
+    text: str = Field(..., description="User text.")
+    display_name: str = Field("", description="Human-readable name — goes into the topic title/header (not a secret).")
+    meta: dict = Field(default_factory=dict, description="Extra context for the operator (product, page) — displayed, not parsed.")
 
 
 class IngressResult(BaseModel):
-    """Relay → продукт: подтверждение приёма ingress."""
+    """Relay → product: acknowledgement of an ingress message."""
 
     ok: bool = True
     ticket_id: str
     thread_id: int
-    message_id: int = 0   # id записанной строки ленты (виджет сопоставляет свой оптимистичный пузырь)
+    message_id: int = 0   # id of the recorded feed row (the widget matches its own optimistic bubble)
 
 
 class WidgetMessage(BaseModel):
-    """Строка ленты для браузерного виджета (GET /v1/widget/messages). deleted=true → виджет убирает пузырь."""
+    """A feed row for the browser widget (GET /v1/widget/messages). deleted=true → the widget removes the bubble."""
 
     id: int
     direction: str          # in | out
@@ -34,18 +34,18 @@ class WidgetMessage(BaseModel):
 
 
 class WidgetPoll(BaseModel):
-    """Ответ polling-опроса виджета: изменения (новые/правленые/удалённые) + курсор seq следующего запроса."""
+    """Widget poll response: changes (new/edited/deleted) + the seq cursor for the next request."""
 
     ok: bool = True
     messages: list[WidgetMessage] = Field(default_factory=list)
-    cursor: int = 0         # max seq ответа → клиент шлёт его в ?since= следующего опроса
+    cursor: int = 0         # max seq of the response → the client sends it in ?since= on the next poll
 
 
 class OperatorEvent(BaseModel):
-    """Relay → продукт (callback): ответ оператора или системное событие тикета."""
+    """Relay → product (callback): an operator reply or a system ticket event."""
 
     event: str = Field("message", description="message | ticket_closed")
     user_ref: str
     ticket_id: str
     text: str = ""
-    operator: str = Field("", description="Кто ответил (для показа/аудита).")
+    operator: str = Field("", description="Who replied (for display/audit).")

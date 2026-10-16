@@ -13,7 +13,7 @@ it drops into any web app behind a thin adapter.
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-> 📖 Detailed design docs (in Russian) live in [`docs/`](docs/README.md): architecture
+> 📖 Detailed design docs live in [`docs/`](docs/README.md): architecture
 > notes, the HTTP contract, and the product‑integration guide.
 
 ## Why
@@ -177,7 +177,7 @@ supportal/
 ├── widget/          # embeddable UI bundle: widget.js + widget.css (vanilla)
 └── app.py           # app assembly + lifespan (long-polling) + CORS
 tests/               # offline unit tests (contract / store / HMAC / widget)
-docs/                # detailed design docs (Russian)
+docs/                # detailed design docs
 ```
 
 ## Security

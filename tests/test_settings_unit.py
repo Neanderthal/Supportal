@@ -1,11 +1,11 @@
-"""settings.py — приоритет settings.yaml → env → дефолт, fail-soft, парсинг bool/int, hot-reload."""
+"""settings.py — priority settings.yaml → env → default, fail-soft, bool/int parsing, hot-reload."""
 import os
 
 from supportal import settings as S
 
 
 def _reset(path) -> None:
-    """Указать стор на конкретный файл и сбросить кэш модуля (так тесты не зависят от порядка)."""
+    """Point the store at a specific file and reset the module cache (so tests don't depend on order)."""
     S._SETTINGS_FILE = str(path)
     S._cache = {}
     S._cache_mtime = -1.0
@@ -17,22 +17,22 @@ def test_file_over_env_over_default(tmp_path, monkeypatch):
     f = tmp_path / "settings.yaml"
     f.write_text("SUPPORT_RATE_LIMIT: on\nSUPPORT_RATE_LIMIT_MAX: 5\n", encoding="utf-8")
     _reset(f)
-    monkeypatch.setenv("SUPPORT_RATE_LIMIT", "off")        # файл должен победить env
+    monkeypatch.setenv("SUPPORT_RATE_LIMIT", "off")        # the file must win over env
     assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True
     assert S.get_int("SUPPORT_RATE_LIMIT_MAX", 20) == 5
-    monkeypatch.setenv("SUPPORT_ONLY_ENV", "on")           # ключ только в env
+    monkeypatch.setenv("SUPPORT_ONLY_ENV", "on")           # key only in env
     assert S.get_bool("SUPPORT_ONLY_ENV", False) is True
-    assert S.get_int("SUPPORT_ABSENT", 7) == 7             # нигде → дефолт
+    assert S.get_int("SUPPORT_ABSENT", 7) == 7             # nowhere → default
     assert S.get_bool("SUPPORT_ABSENT_B", True) is True
 
 
 def test_missing_file_is_failsoft(tmp_path, monkeypatch):
     _reset(tmp_path / "nope.yaml")
     monkeypatch.setenv("SUPPORT_RATE_LIMIT", "on")
-    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True   # нет файла → env, без падения
+    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True   # no file → env, no crash
     _reset(tmp_path / "nope.yaml")
     monkeypatch.delenv("SUPPORT_RATE_LIMIT", raising=False)
-    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is False  # нет файла и env → дефолт
+    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is False  # no file and no env → default
 
 
 def test_bool_parsing(tmp_path):
@@ -51,7 +51,7 @@ def test_broken_yaml_is_failsoft(tmp_path, monkeypatch):
     f.write_text("this: : : not valid\n  - [", encoding="utf-8")
     _reset(f)
     monkeypatch.setenv("SUPPORT_RATE_LIMIT", "on")
-    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True   # мусор → игнор файла, env/дефолт
+    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True   # garbage → ignore the file, env/default
 
 
 def test_hot_reload_on_mtime_change(tmp_path):
@@ -61,6 +61,6 @@ def test_hot_reload_on_mtime_change(tmp_path):
     assert S.get_bool("SUPPORT_RATE_LIMIT", False) is False
     f.write_text("SUPPORT_RATE_LIMIT: on\n", encoding="utf-8")
     st = os.stat(str(f))
-    os.utime(str(f), (st.st_mtime + 10, st.st_mtime + 10))   # гарантируем смену mtime
-    S._last_stat = 0.0                                        # обойти throttle стата
-    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True    # перечиталось живьём
+    os.utime(str(f), (st.st_mtime + 10, st.st_mtime + 10))   # ensure the mtime changes
+    S._last_stat = 0.0                                        # bypass the stat throttle
+    assert S.get_bool("SUPPORT_RATE_LIMIT", False) is True    # re-read live

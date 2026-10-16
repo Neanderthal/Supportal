@@ -1,4 +1,4 @@
-"""FastAPI-поверхность relay: ingress от продукта + health. Публичного Telegram-webhook НЕТ (long-polling)."""
+"""Relay's FastAPI surface: ingress from the product + health. There is NO public Telegram webhook (long-polling)."""
 from __future__ import annotations
 
 import hmac
@@ -23,7 +23,7 @@ def build_router(relay: Relay, ingress_secret: str) -> APIRouter:
     async def ingress(request: Request, x_supportal_signature: str = Header("")) -> IngressResult:
         body = await request.body()
         if not ingress_secret or not hmac.compare_digest(x_supportal_signature, sign(body, ingress_secret)):
-            _LOG.warning("[api] ingress с неверной подписью — 401")
+            _LOG.warning("[api] ingress with a bad signature — 401")
             raise HTTPException(status_code=401, detail="bad signature")
         return await relay.ingress(IngressMessage.model_validate_json(body))
 

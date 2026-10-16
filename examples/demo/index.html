@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Supportal — демо</title>
+  <title>Supportal — demo</title>
   <link rel="stylesheet" href="/static/widget.css">
   <style>
-    /* Виджет использует дизайн-токены хоста в стиле shadcn — HSL-КАНАЛЫ "H S% L%" (НЕ hex!),
-       т.к. внутри оборачивает их в hsl(var(--primary)). Hex здесь сломал бы hsl() → невидимые пузыри. */
+    /* The widget uses the host's design tokens in shadcn style — HSL CHANNELS "H S% L%" (NOT hex!),
+       because internally it wraps them in hsl(var(--primary)). Hex here would break hsl() → invisible bubbles. */
     :root {
-      --primary: 221 83% 53%;              /* синий бренд-цвет: пузыри пользователя + кнопка/FAB */
-      --primary-foreground: 210 40% 98%;   /* текст на --primary */
+      --primary: 221 83% 53%;              /* blue brand color: user bubbles + button/FAB */
+      --primary-foreground: 210 40% 98%;   /* text on --primary */
     }
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; color: #111; background: #f6f7f9; }
     header { background: #111827; color: #fff; padding: 16px 24px; font-size: 18px; }
@@ -23,18 +23,18 @@
   </style>
 </head>
 <body>
-  <header><strong>Acme</strong> — демо-продукт</header>
+  <header><strong>Acme</strong> — demo product</header>
   <main>
     <div class="card">
-      <h1>Тестовая страница с виджетом Supportal</h1>
-      <p>Виджет поддержки встроен в страницу — кнопка <strong>💬</strong> внизу слева.
-         Откройте её и напишите сообщение.</p>
-      <p><strong>Telegram замокан</strong>: ничего не уходит в реальный бот. Чтобы ответить
-         «как оператор», откройте <a href="/operator" target="_blank">консоль оператора</a>
-         (имитация топика Telegram) и ответьте — ответ прилетит в виджет через ~4 c (polling).
-         Там же можно отредактировать или отозвать ответ и увидеть, как правка синхронизируется в виджете.</p>
-      <p class="hint">Токен виджета чеканит демо-эндпоинт <code>POST /support/config</code>;
-         API виджета — под <code>/support-api/v1/widget/*</code> (в проде этот путь даёт reverse-proxy).</p>
+      <h1>Test page with the Supportal widget</h1>
+      <p>The support widget is embedded in the page — the <strong>💬</strong> button at the bottom-left.
+         Open it and type a message.</p>
+      <p><strong>Telegram is mocked</strong>: nothing goes to a real bot. To reply
+         "as the operator", open the <a href="/operator" target="_blank">operator console</a>
+         (a mock Telegram topic) and reply — the reply reaches the widget in ~4s (polling).
+         There you can also edit or recall a reply and see the change sync into the widget.</p>
+      <p class="hint">The widget token is minted by the demo endpoint <code>POST /support/config</code>;
+         the widget API is under <code>/support-api/v1/widget/*</code> (in production a reverse-proxy serves this path).</p>
     </div>
   </main>
   <script src="/static/widget.js"></script>

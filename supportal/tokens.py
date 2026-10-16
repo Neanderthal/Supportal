@@ -1,17 +1,18 @@
-"""Короткоживущий токен доступа браузерного виджета к публичному widget-API relay.
+"""Short-lived access token for the browser widget to reach the relay's public widget API.
 
-Браузер НЕ держит HMAC-секрет и не называет себя сам: продукт (знает залогиненного по своей сессии)
-чеканит токен `mint_widget_token(user_ref)`, relay проверяет `verify_widget_token(...)`. Секрет
-`SUPPORT_WIDGET_SECRET` общий у продукта и relay (как ingress/callback-секреты контракта).
+The browser does NOT hold the HMAC secret and does not name itself: the product (which knows the
+logged-in user from its own session) mints the token with `mint_widget_token(user_ref)`, and the relay
+verifies it with `verify_widget_token(...)`. The secret `SUPPORT_WIDGET_SECRET` is shared between the
+product and the relay (like the ingress/callback contract secrets).
 
-Схема (ИСТОЧНИК ПРАВДЫ — этот файл; продукт в своём репозитории повторяет её 1:1 — минт-функция
-на стороне адаптера продукта):
+Scheme (SOURCE OF TRUTH — this file; the product mirrors it 1:1 in its own repo — the mint function
+lives on the product adapter's side):
 
-    msg   = f"{b64url(user_ref)}.{exp}"          # exp — unix-секунды (int), без паддинга '='
+    msg   = f"{b64url(user_ref)}.{exp}"          # exp — unix seconds (int), no '=' padding
     sig   = hex(HMAC_SHA256(secret, msg))
-    token = f"{msg}.{sig}"                        # три части через '.', всё ASCII/URL-safe
+    token = f"{msg}.{sig}"                        # three parts joined by '.', all ASCII/URL-safe
 
-Проверка: пересобрать sig над первыми двумя частями, `compare_digest`, затем `exp > now`.
+Verification: recompute sig over the first two parts, `compare_digest`, then check `exp > now`.
 """
 from __future__ import annotations
 
@@ -30,7 +31,7 @@ def _b64url_decode(s: str) -> str:
 
 
 def mint_widget_token(user_ref: str, secret: str, ttl: int = 900) -> str:
-    """Подписанный токен `{user_ref, exp}`. Пустой секрет → пустой токен (поддержка выключена)."""
+    """Signed token `{user_ref, exp}`. Empty secret → empty token (support is disabled)."""
     if not secret:
         return ""
     exp = int(time.time()) + int(ttl)
@@ -40,7 +41,7 @@ def mint_widget_token(user_ref: str, secret: str, ttl: int = 900) -> str:
 
 
 def verify_widget_token(token: str, secret: str) -> str | None:
-    """Вернуть `user_ref`, если токен валиден и не просрочен, иначе None. Fail-closed на пустом секрете."""
+    """Return `user_ref` if the token is valid and not expired, else None. Fail-closed on an empty secret."""
     if not secret or not token:
         return None
     parts = token.split(".")

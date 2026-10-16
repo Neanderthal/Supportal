@@ -1,8 +1,8 @@
-"""Ф1 — ingress через HTTP-роут (TestClient) с замоканным TelegramOps.
+"""Ph1 — ingress via the HTTP route (TestClient) with a mocked TelegramOps.
 
-Проверяем: HMAC-гейт /v1/messages (200/401), find-or-create тикета, создание топика один раз на тикет,
-шапку сообщения (имя + контекст meta) и переиспользование открытого тикета. aiogram/сеть не нужны —
-relay собирается с фейковым TelegramOps (async ensure_topic/send_to_topic).
+We check: the HMAC gate on /v1/messages (200/401), find-or-create of the ticket, creating the topic once per ticket,
+the message header (name + meta context) and reuse of an open ticket. aiogram/network not needed —
+the relay is assembled with a fake TelegramOps (async ensure_topic/send_to_topic).
 """
 import os, tempfile
 
@@ -18,7 +18,7 @@ _INGRESS_SECRET = "ing-secret"
 
 
 class _FakeTG:
-    """Двойник TelegramOps: ведёт список созданных топиков и отправленных сообщений."""
+    """A TelegramOps double: keeps a list of created topics and sent messages."""
 
     def __init__(self) -> None:
         self.topics: list[tuple[int, str]] = []
@@ -56,16 +56,16 @@ def _post(client: TestClient, msg: IngressMessage, secret: str = _INGRESS_SECRET
 def test_ingress_valid_signature_creates_ticket_and_topic():
     tg = _FakeTG()
     client = _client(tg)
-    r = _post(client, IngressMessage(user_ref="eng@x", text="не приходит письмо для сброса пароля",
-                                     display_name="Иванов", meta={"product": "web", "page": "Настройки"}))
+    r = _post(client, IngressMessage(user_ref="eng@x", text="the password reset email doesn't arrive",
+                                     display_name="Ivanov", meta={"product": "web", "page": "Settings"}))
     assert r.status_code == 200
     data = r.json()
     assert data["ok"] is True and data["ticket_id"]
     assert data["thread_id"] == tg.topics[0][0]
-    # один топик на тикет, одно отправленное сообщение; шапка несёт имя + контекст, тело — текст
+    # one topic per ticket, one sent message; the header carries name + context, the body — the text
     assert len(tg.topics) == 1 and len(tg.sent) == 1
     sent_text = tg.sent[0][1]
-    assert "Иванов" in sent_text and "product=web" in sent_text and "не приходит письмо для сброса пароля" in sent_text
+    assert "Ivanov" in sent_text and "product=web" in sent_text and "the password reset email doesn't arrive" in sent_text
 
 
 def test_ingress_bad_signature_401():
@@ -85,10 +85,10 @@ def test_ingress_missing_signature_401():
 def test_ingress_reuses_open_ticket_one_topic():
     tg = _FakeTG()
     client = _client(tg)
-    r1 = _post(client, IngressMessage(user_ref="eng@x", text="первое"))
-    r2 = _post(client, IngressMessage(user_ref="eng@x", text="второе"))
+    r1 = _post(client, IngressMessage(user_ref="eng@x", text="first"))
+    r2 = _post(client, IngressMessage(user_ref="eng@x", text="second"))
     assert r1.status_code == 200 and r2.status_code == 200
-    # топик создаётся один раз; оба сообщения ушли в него, тикет тот же
+    # the topic is created once; both messages went into it, the ticket is the same
     assert len(tg.topics) == 1 and len(tg.sent) == 2
     assert r1.json()["ticket_id"] == r2.json()["ticket_id"]
     assert r2.json()["thread_id"] == tg.topics[0][0]

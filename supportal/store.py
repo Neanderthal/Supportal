@@ -1,7 +1,7 @@
-"""Персистентный маппинг тикет ↔ forum-топик ↔ пользователь. Переживает рестарт (топик нельзя терять).
+"""Persistent mapping ticket ↔ forum topic ↔ user. Survives a restart (the topic must not be lost).
 
-Дефолт — локальный SQLite (ноль инфраструктуры, проект самодостаточен). Для многопользовательского
-контура подставить Postgres (тот же интерфейс/схема) — см. docs/integration.md.
+Default — local SQLite (zero infrastructure, the project is self-contained). For a multi-user setup
+swap in Postgres (same interface/schema) — see docs/integration.md.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class Ticket:
 
 @dataclass
 class OutboxItem:
-    """Неподтверждённый ответ оператора (callback продукту вернул delivered=0 или упал) — ждёт повтора."""
+    """An unconfirmed operator reply (the callback to the product returned delivered=0 or failed) — awaiting retry."""
     id: int
     ticket_id: str
     user_ref: str
@@ -32,31 +32,31 @@ class OutboxItem:
     text: str
     operator: str
     status: str          # pending | delivered | dead
-    attempts: int        # сколько попыток доставки уже сделано (живая попытка = 1)
+    attempts: int        # how many delivery attempts have already been made (the live attempt = 1)
     created_at: float
     next_attempt_at: float
 
 
 @dataclass
 class Message:
-    """Строка переписки (лента тикета). Единый источник правды для polling виджета и восстановления."""
+    """A conversation row (the ticket feed). The single source of truth for widget polling and recovery."""
     id: int
     ticket_id: str
     user_ref: str
-    direction: str       # in (пользователь → оператор) | out (оператор/система → пользователь)
-    author: str          # кто написал (для показа): имя пользователя (in) или «Оператор» (out)
+    direction: str       # in (user → operator) | out (operator/system → user)
+    author: str          # who wrote it (for display): the user's name (in) or "Operator" (out)
     text: str
     created_at: float
-    tg_message_id: int = 0   # message_id в Telegram (для edit-sync и /del; 0 — не из топика)
-    deleted: bool = False    # мягкое удаление (оператор отозвал /del) — виджет убирает пузырь
-    seq: int = 0             # монотонный курсор ИЗМЕНЕНИЙ (insert/edit/delete); polling идёт по нему
+    tg_message_id: int = 0   # message_id in Telegram (for edit-sync and /del; 0 — not from a topic)
+    deleted: bool = False    # soft delete (the operator recalled it with /del) — the widget removes the bubble
+    seq: int = 0             # monotonic cursor of CHANGES (insert/edit/delete); polling follows it
 
 
 class Store:
     def __init__(self, db_url: str) -> None:
         if not db_url.startswith("sqlite:///"):
             raise NotImplementedError(
-                "Скелет несёт только SQLite-бэкенд; для Postgres реализовать тот же интерфейс (docs/integration.md).")
+                "The skeleton ships only a SQLite backend; for Postgres implement the same interface (docs/integration.md).")
         self._path = db_url[len("sqlite:///"):]
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -73,8 +73,8 @@ class Store:
                    last_at     REAL NOT NULL)""")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_tickets_user ON tickets(user_ref)")
         self._conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_tickets_thread ON tickets(thread_id)")
-        # outbox — ответы оператора, которые продукт не подтвердил доставленными (delivered=0 / callback упал).
-        # Чистый HTTP-контракт: relay повторяет callback, не зная НИЧЕГО про сессии продукта (граница A).
+        # outbox — operator replies the product did not confirm as delivered (delivered=0 / callback failed).
+        # A pure HTTP contract: the relay retries the callback knowing NOTHING about the product's sessions (boundary A).
         self._conn.execute(
             """CREATE TABLE IF NOT EXISTS outbox (
                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,11 +88,11 @@ class Store:
                    created_at  REAL NOT NULL,
                    next_attempt_at REAL NOT NULL)""")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_outbox_due ON outbox(status, next_attempt_at)")
-        # messages — лента переписки (обе стороны). Источник правды для polling браузерного виджета
-        # (GET /v1/widget/messages?since=<seq>) и восстановления при перезагрузке. Монотонный `seq`
-        # (растёт на insert/edit/delete) = курсор polling (виджет шлёт последний виденный seq → правки и
-        # удаления старых строк тоже доходят). Персистентна → переживает рестарт и оффлайн-пользователя
-        # (ответ оператора не теряется: подтянется при следующем опросе).
+        # messages — the conversation feed (both sides). The source of truth for browser-widget polling
+        # (GET /v1/widget/messages?since=<seq>) and recovery on reload. The monotonic `seq`
+        # (grows on insert/edit/delete) = the polling cursor (the widget sends the last seq it saw → edits and
+        # deletions of old rows also reach it). Persistent → survives a restart and an offline user
+        # (the operator reply is not lost: it is picked up on the next poll).
         self._conn.execute(
             """CREATE TABLE IF NOT EXISTS messages (
                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,8 +105,8 @@ class Store:
                    tg_message_id INTEGER,
                    deleted     INTEGER NOT NULL DEFAULT 0,
                    seq         INTEGER)""")
-        # Миграция существующей таблицы (первый деплой виджета создал messages без новых колонок): добавить
-        # недостающие + бэкофилл seq=id для старых строк (id монотонен → валидный стартовый курсор).
+        # Migrate an existing table (the first widget deploy created messages without the new columns): add
+        # the missing ones + backfill seq=id for old rows (id is monotonic → a valid starting cursor).
         cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(messages)")}
         if "tg_message_id" not in cols:
             self._conn.execute("ALTER TABLE messages ADD COLUMN tg_message_id INTEGER")
@@ -115,7 +115,7 @@ class Store:
         if "seq" not in cols:
             self._conn.execute("ALTER TABLE messages ADD COLUMN seq INTEGER")
             self._conn.execute("UPDATE messages SET seq=id WHERE seq IS NULL")
-        # polling идёт по seq (insert+edit+delete) + по tg_message_id ищем строку при edit/del
+        # polling follows seq (insert+edit+delete) + we look up the row by tg_message_id on edit/del
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_seq ON messages(user_ref, seq)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_tg ON messages(tg_message_id)")
         self._conn.commit()
@@ -159,7 +159,7 @@ class Store:
                            (time.time(), ticket_id))
         self._conn.commit()
 
-    # ── outbox (повторная доставка ответа оператора) ───────────────────────────
+    # ── outbox (retrying operator-reply delivery) ──────────────────────────────
     def _outbox_row(self, row: sqlite3.Row) -> OutboxItem:
         return OutboxItem(id=row["id"], ticket_id=row["ticket_id"], user_ref=row["user_ref"],
                           event=row["event"], text=row["text"], operator=row["operator"],
@@ -197,7 +197,7 @@ class Store:
     def outbox_pending_count(self) -> int:
         return self._conn.execute("SELECT count(*) FROM outbox WHERE status='pending'").fetchone()[0]
 
-    # ── messages (лента переписки для polling виджета) ─────────────────────────
+    # ── messages (conversation feed for widget polling) ────────────────────────
     def _message_row(self, row: sqlite3.Row) -> Message:
         return Message(id=row["id"], ticket_id=row["ticket_id"], user_ref=row["user_ref"],
                        direction=row["direction"], author=row["author"], text=row["text"],
@@ -205,12 +205,12 @@ class Store:
                        deleted=bool(row["deleted"]), seq=row["seq"] or 0)
 
     def _next_seq(self) -> int:
-        """Монотонный курсор изменений: max(seq)+1. Один писатель (SQLite сериализует) → без гонок."""
+        """Monotonic change cursor: max(seq)+1. A single writer (SQLite serializes) → no races."""
         return (self._conn.execute("SELECT COALESCE(MAX(seq),0)+1 FROM messages").fetchone()[0])
 
     def add_message(self, ticket_id: str, user_ref: str, direction: str, author: str, text: str,
                     tg_message_id: int = 0) -> int:
-        """Дописать строку в ленту тикета. tg_message_id — id сообщения в Telegram (для edit/del). Возвращает id."""
+        """Append a row to the ticket feed. tg_message_id — the Telegram message id (for edit/del). Returns the id."""
         cur = self._conn.execute(
             "INSERT INTO messages(ticket_id,user_ref,direction,author,text,created_at,tg_message_id,deleted,seq)"
             " VALUES(?,?,?,?,?,?,?,0,?)",
@@ -226,7 +226,7 @@ class Store:
         return self._message_row(row) if row else None
 
     def update_message_by_tg(self, tg_message_id: int, text: str) -> Message | None:
-        """Edit-sync: оператор отредактировал сообщение в Telegram → обновить текст + поднять seq. None — не нашли."""
+        """Edit-sync: the operator edited a message in Telegram → update the text + bump seq. None — not found."""
         if not tg_message_id or self._by_tg(tg_message_id) is None:
             return None
         self._conn.execute("UPDATE messages SET text=?, seq=? WHERE tg_message_id=? AND direction='out'",
@@ -235,7 +235,7 @@ class Store:
         return self._by_tg(tg_message_id)
 
     def delete_message_by_tg(self, tg_message_id: int) -> Message | None:
-        """/del: пометить сообщение удалённым + поднять seq → виджет уберёт пузырь. None — не нашли."""
+        """/del: mark the message deleted + bump seq → the widget removes the bubble. None — not found."""
         if not tg_message_id or self._by_tg(tg_message_id) is None:
             return None
         self._conn.execute("UPDATE messages SET deleted=1, seq=? WHERE tg_message_id=? AND direction='out'",
@@ -244,8 +244,8 @@ class Store:
         return self._by_tg(tg_message_id)
 
     def clear_messages(self, user_ref: str) -> int:
-        """/clear: пометить ВСЮ ленту пользователя удалённой (один seq на партию) → виджет уберёт все пузыри.
-        Возвращает число затронутых строк. Мягко (deleted=1), чтобы seq оставался монотонным и дошёл polling-ом."""
+        """/clear: mark the user's ENTIRE feed deleted (one seq for the batch) → the widget removes all bubbles.
+        Returns the number of affected rows. Soft (deleted=1) so seq stays monotonic and reaches the client via polling."""
         seq = self._next_seq()
         cur = self._conn.execute(
             "UPDATE messages SET deleted=1, seq=? WHERE user_ref=? AND deleted=0", (seq, user_ref))
@@ -253,10 +253,10 @@ class Store:
         return cur.rowcount
 
     def changes_since(self, user_ref: str, after_seq: int, limit: int = 200) -> list[Message]:
-        """Строки пользователя с seq > after_seq (insert/edit/delete), по возрастанию seq. after_seq=0 → вся лента.
+        """The user's rows with seq > after_seq (insert/edit/delete), ascending by seq. after_seq=0 → the whole feed.
 
-        Содержит и удалённые (deleted=1) — виджет уберёт их пузыри; и отредактированные — обновит текст.
-        Курсор клиента = max(seq) ответа."""
+        Includes deleted ones (deleted=1) — the widget removes their bubbles; and edited ones — it updates the text.
+        The client cursor = max(seq) of the response."""
         cur = self._conn.execute(
             "SELECT * FROM messages WHERE user_ref=? AND seq>? ORDER BY seq LIMIT ?", (user_ref, after_seq, limit))
         return [self._message_row(r) for r in cur.fetchall()]

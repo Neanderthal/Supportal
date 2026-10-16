@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Supportal — консоль оператора (мок Telegram)</title>
+  <title>Supportal — operator console (mock Telegram)</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0f1115; color: #e5e7eb; }
     header { background: #17212b; padding: 12px 20px; color: #fff; }
@@ -27,8 +27,8 @@
   </style>
 </head>
 <body>
-  <header>🛠 Консоль оператора — <b>имитация топика Telegram</b> &nbsp;·&nbsp; <a href="/">← страница пользователя</a></header>
-  <div class="wrap" id="root"><p class="empty">Загрузка…</p></div>
+  <header>🛠 Operator console — <b>mock Telegram topic</b> &nbsp;·&nbsp; <a href="/">← user page</a></header>
+  <div class="wrap" id="root"><p class="empty">Loading…</p></div>
   <script>
     const api = (path, body) => fetch(path, {
       method: body ? "POST" : "GET",
@@ -45,7 +45,7 @@
       await api("/op/api/reply", { thread_id: id, text: t });
       render();
     }
-    async function edit(mid) { const t = prompt("Новый текст ответа:"); if (t == null) return; await api("/op/api/edit", { tg_message_id: mid, text: t }); render(); }
+    async function edit(mid) { const t = prompt("New reply text:"); if (t == null) return; await api("/op/api/edit", { tg_message_id: mid, text: t }); render(); }
     async function del(mid) { await api("/op/api/delete", { tg_message_id: mid }); render(); }
     async function close(id) { await api("/op/api/close", { thread_id: id }); render(); }
 
@@ -58,7 +58,7 @@
       const s = await api("/op/api/state");
       const root = document.getElementById("root");
       if (!s.tickets.length) {
-        root.innerHTML = '<p class="empty">Пока нет обращений. Напишите из виджета на <a href="/">странице пользователя</a>.</p>';
+        root.innerHTML = '<p class="empty">No tickets yet. Send one from the widget on the <a href="/">user page</a>.</p>';
         return;
       }
       root.innerHTML = s.tickets.map(t => `
@@ -70,13 +70,13 @@
           <div class="msgs">${t.messages.map(m => `
             <div class="m ${m.direction === "in" ? "in" : "out"} ${m.deleted ? "del" : ""}">${esc(m.text)}${
               m.direction === "out" && !m.deleted
-                ? `<div class="meta"><a onclick="edit(${m.tg_message_id})">edit</a> · <a onclick="del(${m.tg_message_id})">удалить</a></div>`
+                ? `<div class="meta"><a onclick="edit(${m.tg_message_id})">edit</a> · <a onclick="del(${m.tg_message_id})">delete</a></div>`
                 : ""
             }</div>`).join("")}</div>
           <div class="row">
-            <input type="text" id="in-${t.thread_id}" placeholder="Ответить пользователю…"
+            <input type="text" id="in-${t.thread_id}" placeholder="Reply to the user…"
                    onkeydown="if(event.key==='Enter')reply(${t.thread_id})">
-            <button onclick="reply(${t.thread_id})">Отправить</button>
+            <button onclick="reply(${t.thread_id})">Send</button>
           </div>
         </div>`).join("");
 

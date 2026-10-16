@@ -1,11 +1,12 @@
-"""Публичный API браузерного виджета поддержки (token-gated, polling).
+"""Public API of the browser support widget (token-gated, polling).
 
-Эти роуты — ЕДИНСТВЕННАЯ поверхность relay, доступная браузеру (через reverse-proxy продукта,
-same-origin `/support-api/v1/widget/*` → strip-prefix → сюда). Ingress продукта (`/v1/messages`) наружу НЕ выводится.
+These routes are the ONLY relay surface exposed to the browser (via the product's reverse-proxy,
+same-origin `/support-api/v1/widget/*` → strip-prefix → here). The product ingress (`/v1/messages`) is NOT exposed outward.
 
-Авторизация: `Authorization: Bearer <token>`, где токен чеканит ПРОДУКТ (знает залогиненного) и подписывает
-общим секретом `SUPPORT_WIDGET_SECRET`. `user_ref` берётся ИЗ ТОКЕНА (сервер), не из тела — анти-спуфинг.
-Доставка ответов оператора — polling: виджет шлёт последний виденный id, получает всё, что новее.
+Authorization: `Authorization: Bearer <token>`, where the token is minted by the PRODUCT (which knows the
+logged-in user) and signed with the shared secret `SUPPORT_WIDGET_SECRET`. `user_ref` is taken FROM THE TOKEN
+(server-side), not from the body — anti-spoofing. Operator replies are delivered via polling: the widget
+sends the last id it has seen and receives everything newer.
 """
 from __future__ import annotations
 
@@ -36,11 +37,11 @@ def _rate_limited(user_ref: str) -> bool:
 
 
 class WidgetSend(BaseModel):
-    text: str = Field(..., description="Текст пользователя из виджета.")
+    text: str = Field(..., description="User text from the widget.")
 
 
 def _auth(authorization: str, secret: str) -> str:
-    """user_ref из Bearer-токена или 401. Fail-closed: пустой секрет/токен/подпись/просрочка → отказ."""
+    """user_ref from the Bearer token or 401. Fail-closed: empty secret/token/signature/expiry → reject."""
     token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
     user_ref = verify_widget_token(token, secret)
     if not user_ref:
@@ -60,16 +61,16 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         text = (body.text or "").strip()
         if not text:
             raise HTTPException(status_code=400, detail="empty text")
-        # display_name/meta НЕ берём из браузера (не доверяем) — имя = user_ref, продукт помечаем сервером.
+        # display_name/meta are NOT taken from the browser (untrusted) — name = user_ref, product is set server-side.
         res = await relay.ingress(IngressMessage(user_ref=user_ref, text=text, display_name=user_ref,
                                                  meta={"product": "supportal-widget"}))
-        _LOG.info("[widget] send user=%s len=%dсимв mid=%d", user_ref[:8], len(text), res.message_id)
+        _LOG.info("[widget] send user=%s len=%dchars mid=%d", user_ref[:8], len(text), res.message_id)
         return {"ok": True, "message_id": res.message_id}
 
     @router.get("/messages", response_model=WidgetPoll)
     async def messages(since: int = 0, authorization: str = Header("")) -> WidgetPoll:
         user_ref = _auth(authorization, widget_secret)
-        rows = relay.changes_since(user_ref, since)   # новые + правленые + удалённые (seq-курсор)
+        rows = relay.changes_since(user_ref, since)   # new + edited + deleted (seq cursor)
         items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
                                ts=m.created_at, deleted=m.deleted) for m in rows]
         cursor = rows[-1].seq if rows else since

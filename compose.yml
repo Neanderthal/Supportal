@@ -1,5 +1,5 @@
-# supportal — relay «веб-чат ↔ оператор в Telegram».
-# Co-location рядом с продуктом (та же docker-сеть) либо отдельный хост, доступный продукту по сети.
+# supportal — relay "web-chat ↔ support operator in Telegram".
+# Co-located with the product (same docker network) or a separate host reachable by the product over the network.
 services:
   supportal:
     build: .
@@ -8,4 +8,4 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8500:8500"   # ingress от продукта; Telegram — long-polling (egress), inbound-webhook не нужен
+      - "8500:8500"   # ingress from the product; Telegram — long-polling (egress), no inbound webhook needed

@@ -1,4 +1,4 @@
-"""Конфигурация supportal (env → дефолт). Секреты — только через окружение/.env, не в коде."""
+"""supportal configuration (env → default). Secrets come only from the environment/.env, never the code."""
 from __future__ import annotations
 
 import os
@@ -21,26 +21,26 @@ def _env_int(name: str, default: int) -> int:
 
 @dataclass(frozen=True)
 class Config:
-    # Telegram (сторона оператора)
-    tg_bot_token: str          # SUPPORT_TG_BOT_TOKEN — секрет
-    tg_group_id: int           # SUPPORT_TG_GROUP_ID — forum-супергруппа поддержки (chat_id, обычно отрицательный)
-    tg_proxy: str              # SUPPORT_TG_PROXY — forward-proxy для egress к Telegram (пусто → напрямую; при блокировке egress — через внешний IPv4-хост)
-    # HTTP-контракт с продуктом
-    product_callback_url: str  # SUPPORT_PRODUCT_CALLBACK_URL — куда POST'ить ответы оператора (пусто → модель «прямой виджет», callback дормант)
-    callback_secret: str       # SUPPORT_CALLBACK_SECRET — HMAC relay → продукт
-    ingress_secret: str        # SUPPORT_INGRESS_SECRET — HMAC продукт → relay
-    # Браузерный виджет (прямой доступ к relay через reverse-proxy продукта, same-origin /support-api)
-    widget_secret: str         # SUPPORT_WIDGET_SECRET — общий с продуктом секрет подписи токена доступа виджета
-    allowed_origin: str        # SUPPORT_ALLOWED_ORIGIN — origin продукта для CORS (локальный кросс-оригин dev; пусто → без CORS, облако same-origin)
-    # Хранилище и сеть
-    db_url: str                # SUPPORT_DB_URL — по умолчанию локальный SQLite
+    # Telegram (operator side)
+    tg_bot_token: str          # SUPPORT_TG_BOT_TOKEN — secret
+    tg_group_id: int           # SUPPORT_TG_GROUP_ID — support forum supergroup (chat_id, usually negative)
+    tg_proxy: str              # SUPPORT_TG_PROXY — forward-proxy for egress to Telegram (empty → direct; when egress is blocked — via an external IPv4 host)
+    # HTTP contract with the product
+    product_callback_url: str  # SUPPORT_PRODUCT_CALLBACK_URL — where to POST operator replies (empty → "direct widget" model, callback dormant)
+    callback_secret: str       # SUPPORT_CALLBACK_SECRET — HMAC relay → product
+    ingress_secret: str        # SUPPORT_INGRESS_SECRET — HMAC product → relay
+    # Browser widget (direct access to the relay via the product's reverse-proxy, same-origin /support-api)
+    widget_secret: str         # SUPPORT_WIDGET_SECRET — secret shared with the product for signing the widget access token
+    allowed_origin: str        # SUPPORT_ALLOWED_ORIGIN — product origin for CORS (local cross-origin dev; empty → no CORS, same-origin in the cloud)
+    # Storage and network
+    db_url: str                # SUPPORT_DB_URL — local SQLite by default
     http_port: int             # SUPPORT_HTTP_PORT
-    # Outbox повторной доставки ответа оператора (продукт вернул delivered=0 / callback упал)
-    outbox_retry_interval: int # SUPPORT_OUTBOX_RETRY_INTERVAL — период фонового повтора, с
-    outbox_ttl: int            # SUPPORT_OUTBOX_TTL — сколько держим неотданный ответ, с (затем сдаёмся)
-    outbox_max_attempts: int   # SUPPORT_OUTBOX_MAX_ATTEMPTS — потолок попыток доставки
-    outbox_backoff_base: int   # SUPPORT_OUTBOX_BACKOFF_BASE — базовая задержка backoff, с
-    outbox_backoff_cap: int    # SUPPORT_OUTBOX_BACKOFF_CAP — потолок задержки backoff, с
+    # Outbox for retrying operator-reply delivery (product returned delivered=0 / callback failed)
+    outbox_retry_interval: int # SUPPORT_OUTBOX_RETRY_INTERVAL — background retry period, s
+    outbox_ttl: int            # SUPPORT_OUTBOX_TTL — how long we keep an undelivered reply, s (then give up)
+    outbox_max_attempts: int   # SUPPORT_OUTBOX_MAX_ATTEMPTS — delivery attempt ceiling
+    outbox_backoff_base: int   # SUPPORT_OUTBOX_BACKOFF_BASE — base backoff delay, s
+    outbox_backoff_cap: int    # SUPPORT_OUTBOX_BACKOFF_CAP — backoff delay ceiling, s
 
     @staticmethod
     def from_env() -> "Config":

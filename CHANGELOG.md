@@ -21,6 +21,12 @@ All notable changes to this project are documented here. The format is based on
 - Rate limiting on `POST /v1/widget/send` (`SUPPORT_RATE_LIMIT`, default off) — a
   per-`user_ref` sliding window (`supportal/ratelimit.py`).
 
+### Changed
+- Translated the whole project to English: the `docs/` design docs, all in‑code comments,
+  docstrings and log messages, the demo pages, and the default widget UI copy (button
+  labels, greeting, placeholder, error notice) and the operator "ticket closed" notice.
+  Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
+
 ## [0.1.0] - 2026-10-16
 
 Initial public release.

@@ -44,9 +44,9 @@ uvx pre-commit install
   stays importable (store/models/contract) without it. Keep it that way.
 - **Boundary:** the relay must not depend on any specific product — it only knows
   `user_ref` and the HTTP contract. Keep product‑specific logic out of this repo.
-- **Docs language:** README and community files are in English; the detailed design
-  docs under `docs/` and in‑code comments are in Russian. Keep each document in one
-  language; don't mix.
+- **Docs language:** all documentation — README, community files, the design docs under
+  `docs/`, and in‑code comments — is in English. Keep each document in one language;
+  don't mix.
 
 ## Commit & PR workflow
 
