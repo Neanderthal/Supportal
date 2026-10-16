@@ -246,6 +246,7 @@
     var row = document.createElement("div");
     row.className = "supportal-msg " + (m.direction === "in" ? "supportal-in" : "supportal-out");
     if (m.kind === "away") row.className += " supportal-away";   // out-of-hours auto-reply (SUPPORT_BUSINESS_HOURS)
+    if (m.kind === "ai") row.className += " supportal-ai";       // LLM auto-answer (SUPPORT_AI)
     row.dataset.mid = m.id;
     if (m.direction === "out" && m.author) {
       var who = document.createElement("div");

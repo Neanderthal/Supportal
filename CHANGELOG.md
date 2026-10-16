@@ -56,6 +56,10 @@ All notable changes to this project are documented here. The format is based on
 - Observability (`SUPPORT_METRICS`, default off): `GET /metrics` in Prometheus text format — gauges for tickets
   (by status), messages (by direction), attachments, pending outbox, and `supportal_build_info`
   (`store.metrics` + a dependency-free `supportal/metrics.py` renderer). Unauthenticated — internal scrape only.
+- AI auto-answer (`SUPPORT_AI`, default off): a minimal KB auto-answer (not RAG) — short `.md` docs from
+  `SUPPORT_AI_KB_DIR` are stuffed into an OpenAI-compatible model's context (`SUPPORT_AI_API_BASE/_KEY/_MODEL`);
+  it answers from them (a background 🤖 `kind:"ai"` feed row + topic note) or replies `HANDOFF` for a human
+  (`supportal/ai.py`; fail-soft). The demo ships two Spanish KB docs and stubs the LLM offline.
 
 ### Changed
 - Docs brought in line with the shipped code (code-review follow-up): documented `POST /v1/widget/upload`

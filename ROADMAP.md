@@ -63,7 +63,7 @@ maturity as an open‑source platform.
 
 Kept as plugins/adapters so the core stays product‑agnostic.
 
-- [ ] 🔌 **AI / LLM auto‑answer** from a knowledge base before handing off to a human.
+- [x] 🔌 **AI / LLM auto‑answer** from a small md knowledge base before handing off to a human — `SUPPORT_AI`, default off (docs‑in‑context, not RAG; model replies `HANDOFF` when uncovered).
 - [ ] 🔌 **Multi‑channel ingress** (e‑mail / WhatsApp) → the same Telegram‑operator model.
 - [ ] 🔌 **Multi‑tenant** (several products / supergroups) + a minimal admin UI and tags.
 

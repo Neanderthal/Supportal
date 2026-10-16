@@ -90,6 +90,10 @@
   border-left: 3px solid hsl(var(--ds-primary)); font-style: italic;
 }
 
+/* LLM auto-answer (feature SUPPORT_AI): an operator-side bubble with a distinct accent + 🤖 marker. */
+.supportal-ai .supportal-msg-author::before { content: "🤖 "; }
+.supportal-ai .supportal-bubble { border-left: 3px solid hsl(var(--ds-primary)); }
+
 /* Delivered tick on the user's own messages (feature SUPPORT_RECEIPTS). */
 .supportal-tick { font-size: 0.7rem; color: hsl(var(--ds-muted-fg)); text-align: right; margin-top: 0.1rem; }
 

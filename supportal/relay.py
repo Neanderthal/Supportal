@@ -12,6 +12,7 @@ import logging
 import time
 from collections import defaultdict
 
+from . import ai
 from .flags import Flags
 from .hours import is_within
 from .models import IngressMessage, IngressResult, OperatorEvent
@@ -32,6 +33,9 @@ _LOG = logging.getLogger("supportal.relay")
 # username/name does NOT go to the feed/browser; attribution of a specific operator stays inside the
 # Telegram topic — it's their message). `operator` is still carried in OperatorEvent/logs ("via product" model).
 OPERATOR_DISPLAY = "Operator"
+
+# Author shown for AI auto-answers (feature SUPPORT_AI) — distinct from a human "Operator".
+AI_DISPLAY = "Assistant"
 
 
 def sign(body: bytes, secret: str) -> str:
@@ -59,6 +63,16 @@ class Relay:
         # requests from one user (two tabs / a retry / send+upload) both see "no topic yet" across the
         # `await ensure_topic` and create TWO Telegram topics. One small lock per active user_ref (negligible).
         self._ticket_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        # Fire-and-forget background tasks (AI auto-answer): kept referenced so they aren't GC'd mid-flight.
+        self._bg_tasks: set = set()
+
+    def _spawn(self, coro) -> None:
+        """Run a coroutine in the background (don't block the request). Errors are logged, not swallowed silently."""
+        task = asyncio.create_task(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
+        task.add_done_callback(lambda t: t.cancelled() or t.exception() is None
+                               or _LOG.error("[bg] background task failed: %s", t.exception(), exc_info=t.exception()))
 
     async def _ensure_ticket(self, user_ref: str, display_name: str) -> tuple:
         """The user's open ticket (creating it + its Telegram topic on first contact). Returns (ticket, is_new).
@@ -93,7 +107,26 @@ class Relay:
         _LOG.info("[ingress] ticket=%s thread=%s len=%dchars", ticket.ticket_id, ticket.thread_id, len(msg.text))
         if is_new:
             await self._maybe_away(ticket)   # out-of-hours auto-reply, once per ticket (on first contact)
+        if get_bool(Flags.AI, False):
+            # Attempt a KB-grounded auto-answer in the BACKGROUND so the send returns immediately; the answer
+            # (or nothing, if the model hands off) arrives in the feed shortly after, like an operator reply.
+            self._spawn(self._ai_answer(ticket, msg.text))
         return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id, message_id=mid)
+
+    async def _ai_answer(self, ticket, question: str) -> None:
+        """Feature SUPPORT_AI: ask the LLM to answer `question` from the markdown KB; if it does (not HANDOFF),
+        post the answer into the user's feed (kind=ai) + a note into the topic so the operator sees the bot replied."""
+        answer = await ai.auto_answer(question)
+        if not answer:
+            return
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", AI_DISPLAY, answer, kind="ai")
+        if ticket.thread_id is not None:
+            try:
+                await self._tg.send_to_topic(ticket.thread_id, f"🤖 (auto-answer) {answer}")
+            except Exception:
+                _LOG.warning("[ai] failed to post the auto-answer note into topic thread=%s", ticket.thread_id,
+                             exc_info=True)
+        _LOG.info("[ai] auto-answer posted ticket=%s len=%dchars", ticket.ticket_id, len(answer))
 
     async def _maybe_away(self, ticket) -> None:
         """Feature SUPPORT_BUSINESS_HOURS: when a ticket is opened outside business hours, send a one-time
