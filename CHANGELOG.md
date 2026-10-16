@@ -37,6 +37,12 @@ All notable changes to this project are documented here. The format is based on
   (`msg|csat_request|csat`). The product advertises `csat:true` in `/support/config`; the demo shows it.
 
 ### Changed
+- Documented the **single-process invariant** (architecture review #3): the Telegram long-poller, the
+  outbox-retry loop and the in-memory rate limiter are per-process singletons, so running
+  `uvicorn --workers >1` or multiple replicas breaks delivery (409 Conflict, double outbox, per-worker
+  rate limits). The constraint is now stated loudly at startup (`app.create_app` lifespan log) and in
+  `README.md`, `docs/architecture.md` (§Scaling) and `docs/integration.md`; corrected the "swap in
+  Postgres for multi-user" claim (Postgres shares the store only — scale-out also needs a single leader).
 - Translated the whole project to English: the `docs/` design docs, all in‑code comments,
   docstrings and log messages, the demo pages, and the default widget UI copy (button
   labels, greeting, placeholder, error notice) and the operator "ticket closed" notice.

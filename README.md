@@ -41,7 +41,7 @@ conversation inside your own Telegram workspace, reuses infrastructure you alrea
 - 📨 **Durable fallback** — the optional "via‑product" callback model retries delivery
   from an outbox with backoff (for offline users).
 - 🗄️ **Self‑contained** — SQLite by default; swap in Postgres behind the same `Store`
-  interface.
+  interface (for storage — the service itself stays [single‑process](#storage)).
 - ✅ **Tested & linted** — offline unit tests (no network/Telegram needed), ruff‑clean.
 
 ## Architecture
@@ -155,9 +155,15 @@ Full integration guide: [`docs/integration.md`](docs/integration.md).
 
 ## Storage
 
-SQLite by default (zero infrastructure). For a multi‑user / fault‑tolerant setup,
+SQLite by default (zero infrastructure). For larger‑corpus / fault‑tolerant storage,
 implement the same `store.Store` interface over Postgres and inject it in
 `app.create_app`. Schema and methods: [`supportal/store.py`](supportal/store.py).
+
+> **Run exactly one process.** The Telegram long‑poller, the outbox‑retry loop and the in‑memory rate
+> limiter are per‑process singletons — do **not** run `uvicorn --workers >1` or multiple replicas (two
+> `getUpdates` consumers → Telegram **409 Conflict**; double outbox delivery; per‑worker rate limits).
+> Postgres shares the *store* only; horizontal scale‑out additionally needs a single leader for the
+> poller/outbox. Scale **up**, not out. Details: [`docs/architecture.md`](docs/architecture.md) §Scaling.
 
 ## Development
 

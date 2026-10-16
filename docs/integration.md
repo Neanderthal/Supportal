@@ -64,13 +64,23 @@ feature on (mirrors `context`/`attachments`). Localize the prompt/thanks copy wi
    closes the ticket.
 
 ## Storage
-Default — SQLite (`sqlite:///…`, self-contained). For a multi-user / fault-tolerant setup
+Default — SQLite (`sqlite:///…`, self-contained). For larger-corpus / fault-tolerant **storage**
 implement a class with the `store.Store` interface over Postgres (the same `tickets` table) and swap it
-into `app.create_app`. The schema is in `supportal/store.py`.
+into `app.create_app`. The schema is in `supportal/store.py`. ⚠️ Postgres makes the *store* shared but does
+**not** by itself allow running more than one process — see the scaling note below.
+
+## Scaling — run exactly one process
+supportal is a **single-process service**. The Telegram long-poller, the outbox-retry loop and the in-memory
+rate limiter are per-process singletons, so do **not** run `uvicorn --workers >1` or multiple replicas: two
+processes mean two `getUpdates` consumers (Telegram returns **409 Conflict** and replies split silently),
+double outbox delivery, and per-worker rate limits. Swapping in Postgres only shares the store — horizontal
+scale-out additionally needs a **single leader** for the poller + outbox (and a shared rate limiter, e.g.
+Redis). The constraint is logged loudly at startup. For throughput, scale **up** (one bigger process), not out.
 
 ## Deploying next to the product
 - Co-location: the service in the product's compose, on the same docker network. Ingress and callback travel over internal
   names (`http://supportal:8500`, `http://<product>/…/push`). No public routes need to be added.
+- **One process only** (see §Scaling): run a single container with a single uvicorn worker.
 - Telegram — egress long-polling. ⚠️ In some networks/clouds `api.telegram.org` is reachable **only over
   IPv6**, while a docker network usually has no IPv6. Two paths: (a) enable IPv6 egress for the container; (b) **`SUPPORT_TG_PROXY`** —
   an HTTP CONNECT forward-proxy on an external host with IPv4 egress to Telegram. The proxy should be locked down by the relay's IP +
