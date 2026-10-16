@@ -11,6 +11,7 @@ class IngressMessage(BaseModel):
     text: str = Field(..., description="User text.")
     display_name: str = Field("", description="Human-readable name — goes into the topic title/header (not a secret).")
     meta: dict = Field(default_factory=dict, description="Extra context for the operator (product, page) — displayed, not parsed.")
+    context: dict = Field(default_factory=dict, description="Visitor context (url/title/custom) posted once into the topic on creation; display-only.")
 
 
 class IngressResult(BaseModel):

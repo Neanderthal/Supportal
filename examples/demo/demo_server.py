@@ -27,8 +27,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# The demo turns the attachments feature on (read live by the widget API via settings).
+# The demo turns on the optional features it showcases (read live via settings).
 os.environ.setdefault("SUPPORT_ATTACHMENTS", "on")
+os.environ.setdefault("SUPPORT_VISITOR_CONTEXT", "on")
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
@@ -65,7 +66,8 @@ class FakeTelegramOps:
     def __init__(self) -> None:
         self._next_thread = 1000
         self._next_msg = 5000
-        self.threads: dict[int, str] = {}   # thread_id -> title
+        self.threads: dict[int, str] = {}        # thread_id -> title
+        self.topic_log: dict[int, list] = {}     # thread_id -> posts (mocks what the operator sees in the topic)
 
     async def ensure_topic(self, title: str) -> int:
         self._next_thread += 1
@@ -73,7 +75,7 @@ class FakeTelegramOps:
         return self._next_thread
 
     async def send_to_topic(self, thread_id: int, text: str) -> None:
-        return None   # the user message is already in the feed; nothing to deliver to real Telegram
+        self.topic_log.setdefault(thread_id, []).append(text)   # capture topic posts (e.g. the visitor-context block)
 
     async def send_media(self, thread_id: int, data: bytes, filename: str, mime: str, caption: str = "") -> None:
         return None   # the user's file is already stored by the relay; nothing to deliver to real Telegram
@@ -105,7 +107,7 @@ app.include_router(build_widget_router(relay, DEMO_SECRET), prefix="/support-api
 async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
-            "ttl": 900, "attachments": True, "strings": DEMO_STRINGS}
+            "ttl": 900, "attachments": True, "context": True, "strings": DEMO_STRINGS}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────
@@ -142,8 +144,9 @@ async def op_state() -> dict:
         ticket = store.get_by_thread(thread_id)
         if not ticket:
             continue
+        context = next((p for p in tg.topic_log.get(thread_id, []) if p.startswith("🧭")), "")
         tickets.append({"thread_id": thread_id, "title": title, "user_ref": ticket.user_ref,
-                        "status": ticket.status, "messages": _conversation(ticket.user_ref)})
+                        "status": ticket.status, "messages": _conversation(ticket.user_ref), "context": context})
     return {"tickets": tickets}
 
 

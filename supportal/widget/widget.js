@@ -65,10 +65,24 @@
     return fetchConfig().then(function (j) { if (j) { cfg.token = j.token; if (j.api_base) cfg.api_base = j.api_base; } return !!j; });
   }
 
+  // Visitor context for the operator (feature SUPPORT_VISITOR_CONTEXT; the product reports it via cfg.context).
+  // The host may add custom fields by setting window.supportalContext = { plan: "Pro", account: "…" }.
+  function collectContext() {
+    var c = { url: location.href, title: document.title };
+    if (document.referrer) c.referrer = document.referrer;
+    var custom = window.supportalContext;
+    if (custom && typeof custom === "object") {
+      for (var k in custom) { if (typeof custom[k] === "string") c[k] = custom[k]; }
+    }
+    return c;
+  }
+
   function send(text, retried) {
+    var body = { text: text };
+    if (cfg && cfg.context) body.context = collectContext();
     return fetch(apiUrl("/v1/widget/send"), {
       method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify(body)
     }).then(function (r) {
       if (r.status === 401 && !retried) return refreshToken().then(function (ok) { return ok ? send(text, true) : null; });
       return r.ok ? r.json() : null;

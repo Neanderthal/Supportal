@@ -81,6 +81,7 @@
             <div><b>${esc(t.title)}</b> <span class="status">(${esc(t.user_ref)} · ${esc(t.status)})</span></div>
             <button class="sec" onclick="close(${t.thread_id})">/close</button>
           </div>
+          ${t.context ? `<div style="padding:8px 14px;font-size:12px;white-space:pre-wrap;color:#9fb3c8;border-bottom:1px solid #243140;background:#141c26">${esc(t.context)}</div>` : ""}
           <div class="msgs">${t.messages.map(m => `
             <div class="m ${m.direction === "in" ? "in" : "out"} ${m.deleted ? "del" : ""}">${esc(m.text)}${media(m)}${
               m.direction === "out" && !m.deleted
