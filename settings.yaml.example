@@ -1,0 +1,11 @@
+# supportal — feature flags as settings (optional).
+#
+# Copy to `settings.yaml` (same dir, or point SUPPORT_SETTINGS_FILE at it) to toggle
+# features WITHOUT a restart — the service re-reads the file by mtime on each request.
+# Keys are the env-var names. Priority: settings.yaml > environment > code default.
+# Only behavior flags belong here — never secrets, ports, tokens or DB URLs (those stay in .env).
+
+# Rate limit on POST /v1/widget/send (anti-spam, per user_ref). Default: off.
+SUPPORT_RATE_LIMIT: off
+SUPPORT_RATE_LIMIT_MAX: 20        # messages allowed within the window
+SUPPORT_RATE_LIMIT_WINDOW: 60     # window length, seconds

@@ -100,6 +100,20 @@ Secrets and settings come from the environment (`.env`) — see
 | `SUPPORT_OUTBOX_RETRY_INTERVAL` / `_TTL` / `_MAX_ATTEMPTS` / `_BACKOFF_BASE` / `_BACKOFF_CAP` | contour‑B outbox retry tuning |
 | `SUPPORT_LOG_LEVEL` | `INFO`/`DEBUG`; at INFO/WARNING only metadata is logged, never message text |
 
+## Feature flags
+
+Optional features are **off by default** and gated by a flag. A flag can be set in the
+environment, or in an optional **`settings.yaml`** (copy
+[`settings.yaml.example`](settings.yaml.example)) — the service re-reads that file by mtime,
+so a flag can be toggled **live without a restart**. Priority: `settings.yaml` → environment
+→ default. Only behavior flags belong in `settings.yaml`; secrets stay in `.env`.
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `SUPPORT_RATE_LIMIT` | off | anti-spam on `POST /v1/widget/send`, per `user_ref` |
+| `SUPPORT_RATE_LIMIT_MAX` | 20 | messages allowed within the window |
+| `SUPPORT_RATE_LIMIT_WINDOW` | 60 | window length, seconds |
+
 ## HTTP API
 
 See [`docs/api.md`](docs/api.md) for the full contract. In short:
