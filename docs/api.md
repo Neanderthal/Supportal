@@ -114,3 +114,9 @@ Internal path: the relay itself pulls updates via **long-polling** (getUpdates) 
 ```json
 {"status": "ok", "service": "supportal"}
 ```
+
+## Interactive docs (feature `SUPPORT_OPENAPI`, default off)
+With `SUPPORT_OPENAPI=on`, FastAPI serves the Swagger UI at `GET /docs`, ReDoc at `GET /redoc` and the schema
+at `GET /openapi.json` (routes are grouped by the `widget` / `product` / `health` tags). Off by default — the
+relay usually sits behind the product's reverse-proxy and the API surface need not be public. The flag is read
+**at startup** (the docs URLs are fixed when the app is built), so change it and restart.

@@ -90,6 +90,17 @@ Telegram, so the operator learns the user saw the reply. The user's own messages
 - Read state is operator-facing only — it rides the feed row's `read` flag and does **not** bump the poll `seq`
   (so it never re-notifies the widget). In the demo the mock operator console shows a `✓✓ seen` marker.
 
+## Interactive API docs (feature `SUPPORT_OPENAPI`, default off)
+`SUPPORT_OPENAPI=on` exposes the Swagger UI (`/docs`), ReDoc (`/redoc`) and the OpenAPI schema (`/openapi.json`),
+with routes grouped by the `widget` / `product` / `health` tags. Off by default (don't publish the API surface
+from behind the reverse-proxy unless you mean to). Read at **startup** — change it, then restart.
+
+## Contour B — the reference product adapter
+If the product delivers operator replies itself (instead of the browser widget polling), it implements the two
+sides of contour B: sign messages to `POST /v1/messages` and verify the signed callback to
+`SUPPORT_PRODUCT_CALLBACK_URL`, reporting `delivered` so the relay's outbox retries for offline users. A
+runnable, framework-agnostic illustration lives in [`examples/product_adapter.py`](../examples/product_adapter.py).
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

@@ -124,6 +124,7 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` �
 | `SUPPORT_CANNED` | off | operator sends a preset reply by typing `/c <key>` in the topic (`/c` lists them) |
 | `SUPPORT_CANNED_REPLIES` | — | the preset map: a YAML mapping in `settings.yaml`, or a `k=v;k=v` string in the env |
 | `SUPPORT_RECEIPTS` | off | read receipts: user's read → 👀 reaction in Telegram + a delivered tick in the widget (needs `receipts:true` in `/support/config`) |
+| `SUPPORT_OPENAPI` | off | expose Swagger `/docs`, ReDoc `/redoc` and `/openapi.json` (read at startup — restart to apply) |
 
 ## HTTP API
 
@@ -132,8 +133,9 @@ See [`docs/api.md`](docs/api.md) for the full contract. In short:
 - **Contour A** (Bearer token): `POST /v1/widget/send {text}` → `{ok, message_id}`;
   `GET /v1/widget/messages?since=<seq>` → `{messages:[…], cursor}`.
 - **Contour B** (HMAC `X-Supportal-Signature`): `POST /v1/messages`; signed callback to
-  `SUPPORT_PRODUCT_CALLBACK_URL`.
+  `SUPPORT_PRODUCT_CALLBACK_URL`. A runnable reference adapter: [`examples/product_adapter.py`](examples/product_adapter.py).
 - `GET /health` → `{"status":"ok","service":"supportal"}`.
+- Interactive API docs (Swagger `/docs`, ReDoc `/redoc`): enable with `SUPPORT_OPENAPI=on` (off by default).
 
 ## Telegram setup (one‑time)
 

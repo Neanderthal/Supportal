@@ -20,9 +20,17 @@ from fastapi import FastAPI
 from .api import build_router
 from .config import Config
 from .relay import Relay
+from .settings import get_bool
 from .store import Store
 from .telegram_ops import TelegramOps
 from .widget_api import build_widget_router
+
+# OpenAPI tag descriptions — group the routes in /docs by contour (see docs/api.md).
+_OPENAPI_TAGS = [
+    {"name": "widget", "description": "Contour A — the browser widget (Bearer token minted by the product)."},
+    {"name": "product", "description": "Contour B — the product backend (HMAC `X-Supportal-Signature`)."},
+    {"name": "health", "description": "Liveness / readiness."},
+]
 
 logging.basicConfig(level=os.environ.get("SUPPORT_LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -77,7 +85,18 @@ def create_app(config: Config | None = None) -> FastAPI:
                     await task
             await tg.close()
 
-    app = FastAPI(title="supportal", version="0.1.0", lifespan=lifespan)
+    # Feature SUPPORT_OPENAPI (default off): expose the Swagger UI (/docs), ReDoc (/redoc) and the schema
+    # (/openapi.json). Off by default — the relay usually sits behind the product's reverse-proxy and the API
+    # surface need not be public. Read at startup (not hot): flip it in .env/settings.yaml, then restart.
+    docs_on = get_bool("SUPPORT_OPENAPI", False)
+    app = FastAPI(
+        title="supportal", version="0.1.0", lifespan=lifespan,
+        summary="Embeddable support relay — a browser widget ↔ Telegram operator topics.",
+        openapi_tags=_OPENAPI_TAGS,
+        docs_url="/docs" if docs_on else None,
+        redoc_url="/redoc" if docs_on else None,
+        openapi_url="/openapi.json" if docs_on else None,
+    )
     app.include_router(build_router(relay, cfg.ingress_secret))
     # Public widget API (token-gated) — the browser widget's surface. In production it's reached via the
     # product's reverse-proxy (same-origin `/support-api/v1/widget/*`) → no CORS. We enable CORS ONLY
