@@ -42,11 +42,27 @@
       <p><strong>Business hours:</strong> this demo is rigged to be <em>after hours</em>, so your first message
          gets an automatic ⏰ "we're away" reply (an operator-side bubble with a clock accent). Configure it with
          <code>SUPPORT_BUSINESS_HOURS</code> / <code>SUPPORT_HOURS</code> / <code>SUPPORT_AWAY_MESSAGE</code>.</p>
+      <p><strong>Your data (GDPR):</strong> the product can export or erase everything stored for a user
+         (<code>SUPPORT_GDPR</code>). These buttons stand in for the product's data-subject endpoints:
+         <button type="button" onclick="gdprExport()">Export my data</button>
+         <button type="button" onclick="gdprDelete()">Delete my conversation</button></p>
       <p class="hint">The widget token is minted by the demo endpoint <code>POST /support/config</code>;
          the widget API is under <code>/support-api/v1/widget/*</code> (in production a reverse-proxy serves this path).</p>
     </div>
   </main>
-  <script>window.supportalContext = { plan: "Pro", account: "acme-42" };</script>
+  <script>
+    window.supportalContext = { plan: "Pro", account: "acme-42" };
+    async function gdprExport() {
+      const data = await (await fetch("/demo/export", { method: "POST" })).json();
+      const w = window.open("", "_blank");
+      w.document.write("<pre>" + JSON.stringify(data, null, 2).replace(/</g, "&lt;") + "</pre>");
+    }
+    async function gdprDelete() {
+      if (!confirm("Erase the whole conversation for this user? This cannot be undone.")) return;
+      const r = await (await fetch("/demo/delete", { method: "POST" })).json();
+      alert("Erased: " + JSON.stringify(r.deleted) + "\nReload to see the empty widget.");
+    }
+  </script>
   <script src="/static/widget.js"></script>
 </body>
 </html>

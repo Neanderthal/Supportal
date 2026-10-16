@@ -19,6 +19,7 @@ from fastapi import FastAPI
 
 from .api import build_router
 from .config import Config
+from .flags import Flags
 from .relay import Relay
 from .settings import get_bool
 from .store import Store
@@ -88,7 +89,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     # Feature SUPPORT_OPENAPI (default off): expose the Swagger UI (/docs), ReDoc (/redoc) and the schema
     # (/openapi.json). Off by default — the relay usually sits behind the product's reverse-proxy and the API
     # surface need not be public. Read at startup (not hot): flip it in .env/settings.yaml, then restart.
-    docs_on = get_bool("SUPPORT_OPENAPI", False)
+    docs_on = get_bool(Flags.OPENAPI, False)
     app = FastAPI(
         title="supportal", version="0.1.0", lifespan=lifespan,
         summary="Embeddable support relay — a browser widget ↔ Telegram operator topics.",

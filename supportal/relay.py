@@ -123,6 +123,30 @@ class Relay:
         """Fetch a stored attachment (bytes + metadata) for serving to the browser."""
         return self._store.get_attachment(attachment_id)
 
+    def export_user(self, user_ref: str) -> dict | None:
+        """GDPR data export (feature SUPPORT_GDPR): everything stored for a user_ref. None when the feature is off."""
+        if not get_bool(Flags.GDPR, False):
+            return None
+        data = self._store.export_user(user_ref)
+        _LOG.info("[gdpr] export user=%s tickets=%d messages=%d attachments=%d", user_ref[:8],
+                  len(data["tickets"]), len(data["messages"]), len(data["attachments"]))
+        return data
+
+    async def delete_user(self, user_ref: str) -> dict | None:
+        """GDPR erase (feature SUPPORT_GDPR): delete the user's stored data AND their Telegram topics.
+        None when the feature is off. Topic deletion is best-effort (operator side); the data erase is authoritative."""
+        if not get_bool(Flags.GDPR, False):
+            return None
+        for thread_id in self._store.thread_ids_for_user(user_ref):
+            try:
+                await self._tg.delete_topic(thread_id)
+            except Exception:
+                _LOG.warning("[gdpr] failed to delete topic thread=%s during erase (no permission?)",
+                             thread_id, exc_info=True)
+        counts = self._store.delete_user(user_ref)
+        _LOG.info("[gdpr] erase user=%s removed=%s", user_ref[:8], counts)
+        return counts
+
     async def mark_read(self, user_ref: str, up_to_seq: int) -> int:
         """Read receipt (feature SUPPORT_RECEIPTS): the widget reports it has seen the feed up to `up_to_seq`.
         Mark the operator's `out` messages read and, for each one newly read, set a 👀 reaction on the operator's

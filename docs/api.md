@@ -120,3 +120,17 @@ With `SUPPORT_OPENAPI=on`, FastAPI serves the Swagger UI at `GET /docs`, ReDoc a
 at `GET /openapi.json` (routes are grouped by the `widget` / `product` / `health` tags). Off by default — the
 relay usually sits behind the product's reverse-proxy and the API surface need not be public. The flag is read
 **at startup** (the docs URLs are fixed when the app is built), so change it and restart.
+
+## GDPR: export / erase a user (feature `SUPPORT_GDPR`, default off)
+Contour B (HMAC `X-Supportal-Signature`, like `/v1/messages`). The product authorizes the data-subject request.
+
+**Export:** `POST /v1/admin/export`  — body `{"user_ref": "user@example.com"}`
+```json
+→ {"user_ref": "…", "tickets": [...], "messages": [...], "attachments": [{"filename":"…","mime":"…","data":"<base64>"}]}
+```
+**Erase:** `POST /v1/admin/delete`  — body `{"user_ref": "user@example.com"}`
+```json
+→ {"ok": true, "deleted": {"messages": 12, "attachments": 2, "tickets": 1, "outbox": 0}}
+```
+- Erase is a **hard delete** (messages, attachments, tickets, outbox) and also deletes the user's Telegram topics (best-effort).
+- `404` — feature off; `401` — bad signature; `400` — missing `user_ref`.

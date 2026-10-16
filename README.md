@@ -125,6 +125,7 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` �
 | `SUPPORT_CANNED_REPLIES` | — | the preset map: a YAML mapping in `settings.yaml`, or a `k=v;k=v` string in the env |
 | `SUPPORT_RECEIPTS` | off | read receipts: user's read → 👀 reaction in Telegram + a delivered tick in the widget (needs `receipts:true` in `/support/config`) |
 | `SUPPORT_OPENAPI` | off | expose Swagger `/docs`, ReDoc `/redoc` and `/openapi.json` (read at startup — restart to apply) |
+| `SUPPORT_GDPR` | off | enable `POST /v1/admin/export\|delete {user_ref}` (HMAC) to export or erase a user's data |
 
 ## HTTP API
 

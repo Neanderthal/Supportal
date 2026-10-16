@@ -101,6 +101,16 @@ sides of contour B: sign messages to `POST /v1/messages` and verify the signed c
 `SUPPORT_PRODUCT_CALLBACK_URL`, reporting `delivered` so the relay's outbox retries for offline users. A
 runnable, framework-agnostic illustration lives in [`examples/product_adapter.py`](../examples/product_adapter.py).
 
+## GDPR export / erase (feature `SUPPORT_GDPR`, default off)
+Data-subject operations, authorized by the product over contour B (HMAC). `POST /v1/admin/export {user_ref}`
+returns everything stored for that user (tickets, the message feed, attachments base64-encoded);
+`POST /v1/admin/delete {user_ref}` **hard-deletes** it (messages, attachments, tickets, outbox) and deletes the
+user's Telegram topics (best-effort). Wire these to your product's "download my data" / "delete my account"
+flows. The demo page has **Export my data** / **Delete my conversation** buttons that call them.
+
+> Retention: the relay does not auto-expire data — schedule periodic `POST /v1/admin/delete` from the product
+> for your retention policy (e.g. erase tickets inactive for N days).
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.
