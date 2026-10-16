@@ -59,6 +59,7 @@ class Message:
     deleted: bool = False    # soft delete (the operator recalled it with /del) — the widget removes the bubble
     seq: int = 0             # monotonic cursor of CHANGES (insert/edit/delete); polling follows it
     kind: str = "msg"        # msg (normal) | csat_request (close-notice that asks for a rating) | csat (the rating)
+    read: bool = False       # an `out` message the user has seen (feature SUPPORT_RECEIPTS) — read receipt
     attachment_id: int = 0   # → attachments.id when this row carries a file (0 — text only)
     attachment_name: str = ""  # filename (populated via JOIN in changes_since; "" otherwise)
     attachment_mime: str = ""  # MIME type (populated via JOIN in changes_since)
@@ -135,7 +136,8 @@ class Store:
                    tg_message_id INTEGER,
                    deleted     INTEGER NOT NULL DEFAULT 0,
                    seq         INTEGER,
-                   kind        TEXT NOT NULL DEFAULT 'msg')""")
+                   kind        TEXT NOT NULL DEFAULT 'msg',
+                   read        INTEGER NOT NULL DEFAULT 0)""")
         # Migrate an existing table (the first widget deploy created messages without the new columns): add
         # the missing ones + backfill seq=id for old rows (id is monotonic → a valid starting cursor).
         cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(messages)")}
@@ -150,6 +152,8 @@ class Store:
             self._conn.execute("ALTER TABLE messages ADD COLUMN attachment_id INTEGER")
         if "kind" not in cols:
             self._conn.execute("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'msg'")
+        if "read" not in cols:
+            self._conn.execute("ALTER TABLE messages ADD COLUMN read INTEGER NOT NULL DEFAULT 0")
         # polling follows seq (insert+edit+delete) + we look up the row by tg_message_id on edit/del
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_seq ON messages(user_ref, seq)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_tg ON messages(tg_message_id)")
@@ -267,6 +271,7 @@ class Store:
                        created_at=row["created_at"], tg_message_id=row["tg_message_id"] or 0,
                        deleted=bool(row["deleted"]), seq=row["seq"] or 0,
                        kind=(row["kind"] or "msg") if "kind" in keys else "msg",
+                       read=bool(row["read"]) if "read" in keys else False,
                        attachment_id=(row["attachment_id"] or 0) if "attachment_id" in keys else 0,
                        attachment_name=(row["attachment_name"] or "") if "attachment_name" in keys else "",
                        attachment_mime=(row["attachment_mime"] or "") if "attachment_mime" in keys else "")
@@ -356,3 +361,16 @@ class Store:
             "FROM messages m LEFT JOIN attachments a ON a.id = m.attachment_id "
             "WHERE m.user_ref=? AND m.seq>? ORDER BY m.seq LIMIT ?", (user_ref, after_seq, limit))
         return [self._message_row(r) for r in cur.fetchall()]
+
+    def mark_read(self, user_ref: str, up_to_seq: int) -> list[int]:
+        """Read receipt (feature SUPPORT_RECEIPTS): mark the user's `out` messages with seq ≤ up_to_seq as read.
+        Returns the Telegram message ids that became read JUST NOW (so the caller reacts once per message).
+        Does NOT bump seq — a read-state change must not re-notify the widget (it only matters to the operator)."""
+        rows = self._conn.execute(
+            "SELECT tg_message_id FROM messages WHERE user_ref=? AND direction='out' AND read=0 "
+            "AND seq<=? AND tg_message_id IS NOT NULL", (user_ref, up_to_seq)).fetchall()
+        self._conn.execute(
+            "UPDATE messages SET read=1 WHERE user_ref=? AND direction='out' AND read=0 AND seq<=?",
+            (user_ref, up_to_seq))
+        self._conn.commit()
+        return [r["tg_message_id"] for r in rows if r["tg_message_id"]]

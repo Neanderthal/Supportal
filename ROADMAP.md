@@ -45,7 +45,8 @@ maturity as an open‑source platform.
 ## v0.3 — responsiveness & operator convenience
 
 - [ ] 🧩 **SSE transport** alongside polling (lower latency; graduates a v1 non‑goal). Contract preserved.
-- [ ] 🧩 **Delivery / read status + typing indicator** (lightweight, over the feed / SSE).
+- [x] 🧩 **Delivery / read status** — `SUPPORT_RECEIPTS`, default off (widget delivered tick + 👀 "seen" reaction in Telegram).
+      (Typing indicator deferred: operator→user typing isn't reliably available via the Bot API.)
 - [x] 🧩 **CSAT / rating** after `/close` (widget buttons → feed row / log) — `SUPPORT_CSAT`, default off.
 - [x] 🔌 **Canned responses** — on the Telegram side (`/c <key>`), no agent console — `SUPPORT_CANNED`, default off.
 - [ ] 🧩 **Proactive message** — `POST /v1/widget/push` so the product can initiate a message to a user.

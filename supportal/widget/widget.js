@@ -8,8 +8,9 @@
 //   GET  {CONFIG_URL}            → {api_base, token, ttl}  (the product knows the logged-in user, mints the token)
 //                                   no token / not ok → the widget silently does not start (self-gating)
 //   POST {api_base}/v1/widget/send      Bearer token  {text}          → {ok, message_id}
-//   GET  {api_base}/v1/widget/messages?since=<seq>  Bearer token      → {messages:[{id,direction,author,text,ts,deleted,kind}], cursor}
+//   GET  {api_base}/v1/widget/messages?since=<seq>  Bearer token      → {messages:[{id,direction,author,text,ts,deleted,kind,read}], cursor}
 //   POST {api_base}/v1/widget/csat      Bearer token  {score}         → {ok, message_id}   (feature SUPPORT_CSAT)
+//   POST {api_base}/v1/widget/read      Bearer token  {seq}           → {ok, seen}         (feature SUPPORT_RECEIPTS)
 //
 // Operator replies are delivered via polling (visible tab ~4s, hidden less often). `direction`: in = user,
 // out = operator/system. Reconcile by id: new → add; seen → update text; deleted → remove the bubble.
@@ -49,6 +50,7 @@
   var seen = {};           // id → true (dedup between the optimistic echo and polling)
   var bubbles = {};        // id → DOM bubble (for edit-sync: update text; /del: remove)
   var els = {};            // DOM references
+  var lastReadReported = 0; // feature SUPPORT_RECEIPTS: the highest seq we've reported as "seen"
   // CSAT (feature SUPPORT_CSAT): after a close notice (kind=csat_request) the widget shows a rating prompt,
   // unless this conversation already has a rating (kind=csat). A newer close resets the state (feed is seq-ordered).
   var csatReqId = 0;       // id of the latest close-notice row awaiting a rating
@@ -154,7 +156,20 @@
     }
     firstSync = false;
     maybeShowCsat();
+    reportRead();
     if (changed) { updateBadge(); syncGreeting(); if (isOpen) scrollToBottom(); }
+  }
+
+  // ── read receipts (feature SUPPORT_RECEIPTS) ───────────────────────────────────
+  // While the panel is open, tell the relay we've seen the feed up to lastSeq → the operator learns the
+  // user read their reply. cfg.receipts gates it; we report each cursor at most once (retry on failure).
+  function reportRead() {
+    if (!(cfg && cfg.receipts) || !isOpen || lastSeq <= lastReadReported) return;
+    lastReadReported = lastSeq;
+    fetch(apiUrl("/v1/widget/read"), {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ seq: lastSeq })
+    }).catch(function () { lastReadReported = 0; });   // a blip — the next tick retries
   }
 
   // ── CSAT rating (feature SUPPORT_CSAT) ─────────────────────────────────────────
@@ -243,6 +258,13 @@
     bub.textContent = m.text || "";          // IMPORTANT: text from Telegram → textContent only
     if (!m.text && !m.attachment_id) bub.style.display = "none";  // empty bubble (attachment-only handled below)
     row.appendChild(bub);
+    // Delivered tick on the user's own messages (feature SUPPORT_RECEIPTS): a successful send reached support.
+    if (m.direction === "in" && cfg && cfg.receipts) {
+      var tick = document.createElement("div");
+      tick.className = "supportal-tick";
+      tick.textContent = "✓";
+      row.appendChild(tick);
+    }
     els.list.appendChild(row);
     bubbles[m.id] = bub;                     // for later edit/del by id
     if (m.attachment_id) loadAttachment(bub, m);
@@ -326,7 +348,7 @@
     isOpen = v;
     els.root.classList.toggle("open", v);
     els.fab.setAttribute("aria-expanded", v ? "true" : "false");
-    if (v) { unread = 0; updateBadge(); scrollToBottom(); setTimeout(function () { els.input.focus(); }, 60); }
+    if (v) { unread = 0; updateBadge(); scrollToBottom(); reportRead(); setTimeout(function () { els.input.focus(); }, 60); }
   }
 
   function submit() {

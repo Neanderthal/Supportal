@@ -80,6 +80,16 @@ in the topic. Nothing is exposed to the browser widget — this is purely an ope
 
 Because presets live in `settings.yaml`, they can be edited live (no restart), like the other settings.
 
+## Read receipts (feature `SUPPORT_RECEIPTS`, default off)
+While the widget panel is open it reports the feed position it has displayed (`POST /v1/widget/read {seq}`).
+The relay marks the operator's `out` messages up to that `seq` as read and sets a **👀 reaction** on each one in
+Telegram, so the operator learns the user saw the reply. The user's own messages show a `✓` **delivered** tick.
+
+- `/support/config` should report `"receipts": true` so the widget reports reads and renders the delivered tick.
+- The 👀 reaction is best-effort (the bot needs reaction permission in the group); a failure is logged, not fatal.
+- Read state is operator-facing only — it rides the feed row's `read` flag and does **not** bump the poll `seq`
+  (so it never re-notifies the widget). In the demo the mock operator console shows a `✓✓ seen` marker.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

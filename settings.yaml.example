@@ -39,6 +39,11 @@ SUPPORT_CANNED: off
 #   greeting: "Hi! Thanks for reaching out — how can I help?"
 #   hours: "We're open Mon–Fri, 9:00–18:00."
 
+# Read receipts: the widget reports what the user has seen → the operator learns the user read their reply
+# (a 👀 reaction on the message in Telegram) and the user sees a delivered tick. Needs receipts:true in
+# /support/config for the widget side. Default: off.
+SUPPORT_RECEIPTS: off
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

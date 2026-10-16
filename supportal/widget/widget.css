@@ -90,6 +90,9 @@
   border-left: 3px solid hsl(var(--ds-primary)); font-style: italic;
 }
 
+/* Delivered tick on the user's own messages (feature SUPPORT_RECEIPTS). */
+.supportal-tick { font-size: 0.7rem; color: hsl(var(--ds-muted-fg)); text-align: right; margin-top: 0.1rem; }
+
 /* Attachments (feature SUPPORT_ATTACHMENTS): inline image / file link inside a bubble. */
 .supportal-media {
   display: block; margin-top: 0.35rem; max-width: 100%; max-height: 260px;
