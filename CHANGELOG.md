@@ -90,6 +90,10 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- `POST /v1/widget/read` now honors `SUPPORT_RATE_LIMIT` like the other write routes
+  (`supportal/widget_api.py`): a valid token could otherwise spam read-reports, amplifying into DB writes
+  and one Telegram reaction per newly-read message. (The off path was already a cheap no-op — `mark_read`
+  returns early before any DB access.)
 - Bounded the free-text request fields (`supportal/models.py`, `supportal/widget_api.py`): `text` is capped
   at 4096 chars (Telegram's message limit) on both contours and the CSAT `comment` at 500, declared at the
   DTO boundary → a clean **422** instead of unbounded input or a failed Telegram send.

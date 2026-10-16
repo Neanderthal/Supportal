@@ -134,3 +134,19 @@ def test_endpoint_off_marks_nothing(tmp_path, monkeypatch):
     assert client.post("/v1/widget/read", json={"seq": 9999}, headers=_auth()).json()["seen"] == 0
     msgs = client.get("/v1/widget/messages?since=0", headers=_auth()).json()["messages"]
     assert not any(m["read"] for m in msgs)
+
+
+def test_endpoint_is_rate_limited(tmp_path, monkeypatch):
+    # /read honors SUPPORT_RATE_LIMIT like the other write routes (a valid token can't spam mark_read).
+    from supportal.ratelimit import limiter
+    _force_env_only(tmp_path)
+    monkeypatch.setenv("SUPPORT_RECEIPTS", "on")
+    monkeypatch.setenv("SUPPORT_RATE_LIMIT", "on")
+    monkeypatch.setenv("SUPPORT_RATE_LIMIT_MAX", "1")
+    monkeypatch.setenv("SUPPORT_RATE_LIMIT_WINDOW", "60")
+    limiter.reset()
+    relay, st, _ = _relay()
+    _seed(st)
+    client = _client(relay)
+    assert client.post("/v1/widget/read", json={"seq": 1}, headers=_auth()).status_code == 200
+    assert client.post("/v1/widget/read", json={"seq": 2}, headers=_auth()).status_code == 429
