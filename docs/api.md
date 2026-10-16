@@ -43,8 +43,22 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 ```
 - Sent after the operator closes the ticket (the widget shows a 1..5 star prompt under the `csat_request` notice).
 - The rating is recorded as a `kind:"csat"` feed row and posted into the ticket's Telegram topic so the operator sees it.
-- `score` is required and validated to `1..5` (`422` otherwise); `comment` is optional. `404` — feature off or no ticket to rate; `429` — rate-limited.
+- `score` is required and validated to `1..5` (`422` otherwise); `comment` is optional (≤ 500 chars → `422`). `404` — feature off or no ticket to rate; `429` — rate-limited.
 - The product must also advertise `csat: true` in `POST /support/config` for the widget to render the prompt.
+
+**Attachments** (feature `SUPPORT_ATTACHMENTS`, default off)
+- **Upload:** `POST /v1/widget/upload?name=<filename>` — the raw request body **is** the file bytes (no multipart);
+  the request `Content-Type` becomes the stored mime and `?name=` the filename.
+```json
+(raw bytes)                                        →  {"ok": true, "message_id": 41, "attachment_id": 7}
+```
+  `404` feature off · `413` over `SUPPORT_ATTACHMENTS_MAX_MB` · `429` rate-limited · `400` empty body.
+- **Download:** `GET /v1/widget/attachment/{id}` — returns the bytes, **Bearer-gated and ownership-checked**
+  (a user may read only their own attachments → `404` otherwise). The widget renders images inline and links
+  other types for download. Operator-sent files (photos/documents in the topic) arrive as `out` feed rows the
+  same way.
+
+**Send a message with text ≤ 4096 chars** (Telegram's limit) — over that → `422` (applies to `/send` and `/v1/messages`).
 
 **Operator commands/edits — via Telegram, NOT via HTTP** (the Bot API does not send bots deletion events):
 - the operator **edits** their message in the topic → the relay catches `edited_message` → the text is updated in the feed

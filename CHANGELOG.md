@@ -58,6 +58,11 @@ All notable changes to this project are documented here. The format is based on
   (`store.metrics` + a dependency-free `supportal/metrics.py` renderer). Unauthenticated — internal scrape only.
 
 ### Changed
+- Docs brought in line with the shipped code (code-review follow-up): documented `POST /v1/widget/upload`
+  and the attachment download in `docs/api.md`; refreshed the `docs/architecture.md` data model (the
+  `messages` `kind`/`read`/`attachment_id` columns, the `attachments` and `seq_counter` tables) and dropped
+  attachments from the v1 non-goals; clarified in `docs/integration.md` that CSAT "rate once" is
+  widget-side only (the relay does not deduplicate).
 - Smaller architecture-review cleanups (#8): added `supportal/flags.py` — feature-flag/setting **names** as
   constants (`Flags.ATTACHMENTS`, …) so a typo is an `AttributeError`, not a silent fall-back to the default;
   adopted them in `relay.py`/`widget_api.py`. Aligned the `meta` docstring/`docs/api.md` with reality
