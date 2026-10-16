@@ -20,6 +20,7 @@ class IngressResult(BaseModel):
     ticket_id: str
     thread_id: int
     message_id: int = 0   # id of the recorded feed row (the widget matches its own optimistic bubble)
+    attachment_id: int = 0  # set when the message carries a file (feature SUPPORT_ATTACHMENTS)
 
 
 class WidgetMessage(BaseModel):
@@ -31,6 +32,9 @@ class WidgetMessage(BaseModel):
     text: str = ""
     ts: float = 0.0
     deleted: bool = False
+    attachment_id: int = 0  # >0 → fetch bytes from /v1/widget/attachment/{id}
+    attachment_name: str = ""
+    attachment_mime: str = ""
 
 
 class WidgetPoll(BaseModel):

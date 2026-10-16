@@ -50,16 +50,18 @@ def test_start_polling_registers_handlers(monkeypatch):
     async def _noop(*a):
         return None
 
-    asyncio.run(tg.start_polling(_noop, _noop, _noop, _noop))
-    # 2 message handlers (command+text) + 1 edited_message handler (edit-sync)
-    assert captured == {"msg_handlers": 2, "edit_handlers": 1,
+    asyncio.run(tg.start_polling(_noop, _noop, _noop, _noop, _noop))
+    # 3 message handlers (command+media+text) + 1 edited_message handler (edit-sync)
+    assert captured == {"msg_handlers": 3, "edit_handlers": 1,
                         "handle_signals": False, "close_bot_session": False}
 
 
 def _handlers(tg, on_message, on_command, on_edit, on_delete):
-    tg._register_handlers(on_message, on_command, on_edit, on_delete)
+    async def _media(*a):
+        return None
+    tg._register_handlers(on_message, on_command, on_edit, on_delete, _media)
     return (tg._dp.message.handlers[0].callback,      # [0] command
-            tg._dp.message.handlers[1].callback,      # [1] text
+            tg._dp.message.handlers[2].callback,      # [2] text ([1] is media)
             tg._dp.edited_message.handlers[0].callback)  # edited_message
 
 

@@ -18,6 +18,7 @@ console propagates to the widget (seq cursor), exactly as `edited_message` / `/d
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -26,7 +27,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from fastapi import FastAPI, HTTPException  # noqa: E402
+# The demo turns the attachments feature on (read live by the widget API via settings).
+os.environ.setdefault("SUPPORT_ATTACHMENTS", "on")
+
+from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -63,6 +67,9 @@ class FakeTelegramOps:
     async def send_to_topic(self, thread_id: int, text: str) -> None:
         return None   # the user message is already in the feed; nothing to deliver to real Telegram
 
+    async def send_media(self, thread_id: int, data: bytes, filename: str, mime: str, caption: str = "") -> None:
+        return None   # the user's file is already stored by the relay; nothing to deliver to real Telegram
+
     async def delete_topic(self, thread_id: int) -> None:
         self.threads.pop(thread_id, None)
 
@@ -89,7 +96,8 @@ app.include_router(build_widget_router(relay, DEMO_SECRET), prefix="/support-api
 @app.post("/support/config")
 async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
-    return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900), "ttl": 900}
+    return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
+            "ttl": 900, "attachments": True}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────
@@ -113,7 +121,9 @@ class CloseIn(BaseModel):
 
 def _conversation(user_ref: str) -> list[dict]:
     return [{"id": m.id, "direction": m.direction, "author": m.author, "text": m.text,
-             "deleted": m.deleted, "tg_message_id": m.tg_message_id}
+             "deleted": m.deleted, "tg_message_id": m.tg_message_id,
+             "attachment_id": m.attachment_id, "attachment_name": m.attachment_name,
+             "attachment_mime": m.attachment_mime}
             for m in store.changes_since(user_ref, 0)]
 
 
@@ -129,6 +139,18 @@ async def op_state() -> dict:
     return {"tickets": tickets}
 
 
+@app.get("/op/api/attachment/{attachment_id}")
+async def op_attachment(attachment_id: int) -> Response:
+    """Serve attachment bytes to the operator console (demo-only, no auth — unlike the token-gated widget route)."""
+    att = store.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="not found")
+    headers = {}
+    if not (att.mime or "").startswith("image/"):
+        headers["Content-Disposition"] = f'attachment; filename="{att.filename}"'
+    return Response(content=att.data, media_type=att.mime or "application/octet-stream", headers=headers)
+
+
 @app.post("/op/api/reply")
 async def op_reply(body: ReplyIn) -> dict:
     if not store.get_by_thread(body.thread_id):
@@ -136,6 +158,20 @@ async def op_reply(body: ReplyIn) -> dict:
     mid = tg.next_message_id()
     await relay.on_operator_message(body.thread_id, body.text, "Operator (demo)", tg_message_id=mid)
     return {"ok": True, "tg_message_id": mid}
+
+
+@app.post("/op/api/reply_media")
+async def op_reply_media(request: Request, thread_id: int, name: str = "") -> dict:
+    """Operator sends a file (raw body; Content-Type → mime, ?name= → filename). Stands in for a Telegram photo/document."""
+    if not store.get_by_thread(thread_id):
+        raise HTTPException(status_code=404, detail="unknown thread")
+    data = await request.body()
+    if not data:
+        raise HTTPException(status_code=400, detail="empty file")
+    mime = (request.headers.get("content-type") or "application/octet-stream").split(";")[0].strip()
+    await relay.on_operator_media(thread_id, data, name or "file", mime, "", "Operator (demo)",
+                                  tg_message_id=tg.next_message_id())
+    return {"ok": True}
 
 
 @app.post("/op/api/edit")

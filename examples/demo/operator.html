@@ -48,6 +48,20 @@
     async function edit(mid) { const t = prompt("New reply text:"); if (t == null) return; await api("/op/api/edit", { tg_message_id: mid, text: t }); render(); }
     async function del(mid) { await api("/op/api/delete", { tg_message_id: mid }); render(); }
     async function close(id) { await api("/op/api/close", { thread_id: id }); render(); }
+    async function sendFile(id, input) {
+      const file = input.files && input.files[0]; input.value = "";
+      if (!file) return;
+      await fetch("/op/api/reply_media?thread_id=" + id + "&name=" + encodeURIComponent(file.name),
+        { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+      render();
+    }
+    function media(m) {
+      if (!m.attachment_id) return "";
+      const url = "/op/api/attachment/" + m.attachment_id;
+      return (m.attachment_mime || "").indexOf("image/") === 0
+        ? `<a href="${url}" target="_blank"><img src="${url}" style="max-width:220px;max-height:200px;border-radius:8px;display:block;margin-top:4px"></a>`
+        : `<a href="${url}" style="color:#6ab0ff;font-size:12px">📎 ${esc(m.attachment_name || "file")}</a>`;
+    }
 
     async function render() {
       // preserve what the operator is typing across the periodic re-render
@@ -68,7 +82,7 @@
             <button class="sec" onclick="close(${t.thread_id})">/close</button>
           </div>
           <div class="msgs">${t.messages.map(m => `
-            <div class="m ${m.direction === "in" ? "in" : "out"} ${m.deleted ? "del" : ""}">${esc(m.text)}${
+            <div class="m ${m.direction === "in" ? "in" : "out"} ${m.deleted ? "del" : ""}">${esc(m.text)}${media(m)}${
               m.direction === "out" && !m.deleted
                 ? `<div class="meta"><a onclick="edit(${m.tg_message_id})">edit</a> · <a onclick="del(${m.tg_message_id})">delete</a></div>`
                 : ""
@@ -77,6 +91,8 @@
             <input type="text" id="in-${t.thread_id}" placeholder="Reply to the user…"
                    onkeydown="if(event.key==='Enter')reply(${t.thread_id})">
             <button onclick="reply(${t.thread_id})">Send</button>
+            <input type="file" id="file-${t.thread_id}" style="display:none" onchange="sendFile(${t.thread_id}, this)">
+            <button class="sec" onclick="document.getElementById('file-${t.thread_id}').click()">📎</button>
           </div>
         </div>`).join("");
 

@@ -63,6 +63,13 @@ def test_token_roundtrip_and_failures():
     assert verify_widget_token(mint_widget_token("a", _SECRET, -1), _SECRET) is None
     assert verify_widget_token(t, "") is None and verify_widget_token("", _SECRET) is None
     assert mint_widget_token("a", "", 60) == ""
+    # malformed structure (not 3 dot-parts) → None
+    assert verify_widget_token("only.two", _SECRET) is None
+    # valid signature but a ref that decodes to invalid UTF-8 → except-branch returns None (no crash)
+    import hashlib, hmac
+    _msg = "_w.9999999999"                   # "_w" = b64url(b"\xff"); decoding to str raises UnicodeDecodeError
+    _sig = hmac.new(_SECRET.encode(), _msg.encode(), hashlib.sha256).hexdigest()
+    assert verify_widget_token(f"{_msg}.{_sig}", _SECRET) is None
 
 
 # ── store: feed + seq cursor ──────────────────────────────────────────────────────

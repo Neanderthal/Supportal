@@ -18,6 +18,8 @@ OnMessage = Callable[[int, str, str, int], Awaitable[None]]  # (thread_id, text,
 OnCommand = Callable[[int, str, str], Awaitable[None]]       # (thread_id, command, operator) → None
 OnEdit = Callable[[int, str], Awaitable[None]]               # (tg_message_id, new_text) → None
 OnDelete = Callable[[int], Awaitable[None]]                  # (tg_message_id) → None
+# (thread_id, data, filename, mime, caption, operator, tg_message_id) → None
+OnMedia = Callable[[int, bytes, str, str, str, str, int], Awaitable[None]]
 
 # Operator commands in the topic: /close (close), /del (recall a message — as a reply), /clear (clear both
 # sides), /help (hint), /ban — reserved. Telegram does NOT send bots deletion events → /del + edit-sync.
@@ -67,8 +69,24 @@ class TelegramOps:
         """Delete the forum topic entirely (all messages in it) — the Telegram side of /clear. Requires can_manage_topics."""
         await self._bot.delete_forum_topic(chat_id=self._group_id, message_thread_id=thread_id)
 
+    async def send_media(self, thread_id: int, data: bytes, filename: str, mime: str, caption: str = "") -> None:
+        """Send a file into the topic: a photo for images (inline), a document otherwise."""
+        from aiogram.types import BufferedInputFile
+        file = BufferedInputFile(data, filename=filename or "file")
+        cap = caption or None
+        if mime.startswith("image/") and mime not in ("image/gif", "image/svg+xml"):
+            await self._bot.send_photo(chat_id=self._group_id, message_thread_id=thread_id, photo=file, caption=cap)
+        else:
+            await self._bot.send_document(chat_id=self._group_id, message_thread_id=thread_id, document=file, caption=cap)
+
+    async def _download(self, file_id: str) -> bytes:
+        """Fetch file bytes from Telegram (getFile + download) — for operator-sent photos/documents."""
+        file = await self._bot.get_file(file_id)
+        buf = await self._bot.download_file(file.file_path)
+        return buf.read()
+
     def _register_handlers(self, on_message: OnMessage, on_command: OnCommand,
-                           on_edit: OnEdit, on_delete: OnDelete) -> None:
+                           on_edit: OnEdit, on_delete: OnDelete, on_media: OnMedia) -> None:
         """Supergroup topic handlers: /del → recall (on_delete), /close|/ban → on_command, text →
         on_message, text EDITING → on_edit (edited_message).
 
@@ -114,12 +132,31 @@ class TelegramOps:
             _LOG.info("[op] edit thread=%s msg=%s len=%dchars",
                       message.message_thread_id, message.message_id, len(message.text or ""))
 
+        async def _handle_media(message: Message) -> None:
+            # Operator sent a photo or a document → download the bytes and hand them to the relay.
+            if message.photo:
+                ps = message.photo[-1]                      # the largest available size
+                file_id, filename, mime = ps.file_id, "photo.jpg", "image/jpeg"
+            elif message.document:
+                d = message.document
+                file_id = d.file_id
+                filename = d.file_name or "file"
+                mime = d.mime_type or "application/octet-stream"
+            else:
+                return
+            data = await self._download(file_id)
+            await on_media(message.message_thread_id, data, filename, mime, message.caption or "",
+                           operator_name(message.from_user), message.message_id)
+            _LOG.info("[op] media thread=%s msg=%s mime=%s size=%d",
+                      message.message_thread_id, message.message_id, mime, len(data))
+
         self._dp.message.register(_handle_command, in_our_topic, Command(commands=_OPERATOR_COMMANDS))
+        self._dp.message.register(_handle_media, in_our_topic, F.photo | F.document)
         self._dp.message.register(_handle_text, in_our_topic, F.text, ~F.text.startswith("/"))
         self._dp.edited_message.register(_handle_edit, in_our_topic, F.text, ~F.text.startswith("/"))
 
     async def start_polling(self, on_message: OnMessage, on_command: OnCommand,
-                            on_edit: OnEdit, on_delete: OnDelete) -> None:
+                            on_edit: OnEdit, on_delete: OnDelete, on_media: OnMedia) -> None:
         """Listen to operators via long-polling (getUpdates). Blocks until the task is cancelled. Registering the
         edited_message handler → aiogram itself includes that update type in allowed_updates.
 
@@ -127,7 +164,7 @@ class TelegramOps:
         uvicorn installs its own signal handlers. close_bot_session=False — the bot session is closed by app
         (lifespan → TelegramOps.close), single ownership.
         """
-        self._register_handlers(on_message, on_command, on_edit, on_delete)
+        self._register_handlers(on_message, on_command, on_edit, on_delete, on_media)
         _LOG.info("[tg] supergroup long-polling group_id=%s — start", self._group_id)
         await self._dp.start_polling(self._bot, handle_signals=False, close_bot_session=False)
 

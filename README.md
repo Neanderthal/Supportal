@@ -113,6 +113,8 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` â
 | `SUPPORT_RATE_LIMIT` | off | anti-spam on `POST /v1/widget/send`, per `user_ref` |
 | `SUPPORT_RATE_LIMIT_MAX` | 20 | messages allowed within the window |
 | `SUPPORT_RATE_LIMIT_WINDOW` | 60 | window length, seconds |
+| `SUPPORT_ATTACHMENTS` | off | file attachments both ways (images inline, other files as links); bytes stored in the DB |
+| `SUPPORT_ATTACHMENTS_MAX_MB` | 10 | max upload size, MB |
 
 ## HTTP API
 
