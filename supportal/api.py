@@ -5,6 +5,7 @@ import hmac
 import logging
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
+from pydantic import ValidationError
 
 from .metrics import CONTENT_TYPE as METRICS_CONTENT_TYPE
 from .metrics import render as render_metrics
@@ -42,7 +43,14 @@ def build_router(relay: Relay, ingress_secret: str) -> APIRouter:
                  description="Contour B. HMAC-signed with `SUPPORT_INGRESS_SECRET` via `X-Supportal-Signature`.")
     async def ingress(request: Request, x_supportal_signature: str = Header("")) -> IngressResult:
         body = await _verified_body(request, x_supportal_signature)
-        return await relay.ingress(IngressMessage.model_validate_json(body))
+        # The signature is valid (trusted product) but the payload may still be malformed/incomplete — a
+        # bad adapter must get a clean 422, not an unhandled 500 (the body bypasses FastAPI's own validation).
+        try:
+            msg = IngressMessage.model_validate_json(body)
+        except ValidationError:
+            _LOG.warning("[api] ingress with a signed but invalid body — 422")
+            raise HTTPException(status_code=422, detail="invalid message body") from None
+        return await relay.ingress(msg)
 
     @router.post("/v1/admin/export", tags=["product"], summary="GDPR: export a user's data (feature SUPPORT_GDPR)",
                  description="Contour B (HMAC). Body `{user_ref}`. Returns the user's tickets/messages/attachments.")

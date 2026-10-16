@@ -82,6 +82,16 @@ def test_ingress_missing_signature_401():
     assert r.status_code == 401
 
 
+def test_ingress_signed_but_malformed_body_422():
+    # A VALID signature over an incomplete/non-JSON payload must yield 422, not an unhandled 500.
+    client = _client(_FakeTG())
+    for body in (b'{"user_ref": "eng@x"}', b"not json at all"):   # missing `text`; not JSON
+        r = client.post("/v1/messages", content=body,
+                        headers={"Content-Type": "application/json",
+                                 "X-Supportal-Signature": sign(body, _INGRESS_SECRET)})
+        assert r.status_code == 422
+
+
 def test_ingress_reuses_open_ticket_one_topic():
     tg = _FakeTG()
     client = _client(tg)
