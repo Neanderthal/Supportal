@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format is based on
   pre‑commit config.
 - English `README.md` and package metadata (authors, license, URLs, classifiers).
 - `ROADMAP.md`; replaced the internal mini‑spec with a focused `docs/architecture.md`.
+- `examples/demo/` — a local demo page with the embedded widget and a mocked Telegram
+  side (mock operator console); documented the widget theming token format.
+- Renamed the project `dali-support` → `supportal`.
 
 ## [0.1.0] - 2026-10-16
 

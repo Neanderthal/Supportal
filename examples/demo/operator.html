@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Supportal — консоль оператора (мок Telegram)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0f1115; color: #e5e7eb; }
+    header { background: #17212b; padding: 12px 20px; color: #fff; }
+    header a { color: #6ab0ff; }
+    .wrap { max-width: 840px; margin: 24px auto; padding: 0 16px; }
+    .ticket { background: #17212b; border: 1px solid #243140; border-radius: 10px; margin: 14px 0; overflow: hidden; }
+    .thead { padding: 10px 14px; background: #1d2a38; display: flex; justify-content: space-between; align-items: center; }
+    .status { font-size: 12px; opacity: .65; }
+    .msgs { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-height: 40px; }
+    .m { max-width: 80%; padding: 7px 11px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; }
+    .in { align-self: flex-start; background: #243140; }
+    .out { align-self: flex-end; background: #2b5278; }
+    .del { opacity: .45; text-decoration: line-through; }
+    .meta { font-size: 11px; opacity: .65; margin-top: 3px; }
+    .meta a { color: #cdd; cursor: pointer; }
+    .row { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid #243140; }
+    input[type=text] { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid #334155; background: #0f1115; color: #e5e7eb; }
+    button { padding: 7px 14px; border: 0; border-radius: 8px; background: #2b5278; color: #fff; cursor: pointer; }
+    button.sec { background: #3a2b2b; font-size: 12px; padding: 4px 8px; }
+    .empty { opacity: .6; }
+  </style>
+</head>
+<body>
+  <header>🛠 Консоль оператора — <b>имитация топика Telegram</b> &nbsp;·&nbsp; <a href="/">← страница пользователя</a></header>
+  <div class="wrap" id="root"><p class="empty">Загрузка…</p></div>
+  <script>
+    const api = (path, body) => fetch(path, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined
+    }).then(r => r.json());
+
+    function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+    async function reply(id) {
+      const i = document.getElementById("in-" + id);
+      const t = (i.value || "").trim(); if (!t) return;
+      i.value = "";
+      await api("/op/api/reply", { thread_id: id, text: t });
+      render();
+    }
+    async function edit(mid) { const t = prompt("Новый текст ответа:"); if (t == null) return; await api("/op/api/edit", { tg_message_id: mid, text: t }); render(); }
+    async function del(mid) { await api("/op/api/delete", { tg_message_id: mid }); render(); }
+    async function close(id) { await api("/op/api/close", { thread_id: id }); render(); }
+
+    async function render() {
+      // preserve what the operator is typing across the periodic re-render
+      const act = document.activeElement;
+      const aid = act && act.id && act.id.indexOf("in-") === 0 ? act.id : null;
+      const aval = aid ? act.value : null, asel = aid ? act.selectionStart : null;
+
+      const s = await api("/op/api/state");
+      const root = document.getElementById("root");
+      if (!s.tickets.length) {
+        root.innerHTML = '<p class="empty">Пока нет обращений. Напишите из виджета на <a href="/">странице пользователя</a>.</p>';
+        return;
+      }
+      root.innerHTML = s.tickets.map(t => `
+        <div class="ticket">
+          <div class="thead">
+            <div><b>${esc(t.title)}</b> <span class="status">(${esc(t.user_ref)} · ${esc(t.status)})</span></div>
+            <button class="sec" onclick="close(${t.thread_id})">/close</button>
+          </div>
+          <div class="msgs">${t.messages.map(m => `
+            <div class="m ${m.direction === "in" ? "in" : "out"} ${m.deleted ? "del" : ""}">${esc(m.text)}${
+              m.direction === "out" && !m.deleted
+                ? `<div class="meta"><a onclick="edit(${m.tg_message_id})">edit</a> · <a onclick="del(${m.tg_message_id})">удалить</a></div>`
+                : ""
+            }</div>`).join("")}</div>
+          <div class="row">
+            <input type="text" id="in-${t.thread_id}" placeholder="Ответить пользователю…"
+                   onkeydown="if(event.key==='Enter')reply(${t.thread_id})">
+            <button onclick="reply(${t.thread_id})">Отправить</button>
+          </div>
+        </div>`).join("");
+
+      if (aid) { const n = document.getElementById(aid); if (n) { n.value = aval; n.focus(); try { n.setSelectionRange(asel, asel); } catch (e) {} } }
+    }
+
+    render();
+    setInterval(render, 3000);
+  </script>
+</body>
+</html>
