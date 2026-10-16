@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Supportal — демо</title>
+  <link rel="stylesheet" href="/static/widget.css">
+  <style>
+    /* Виджет использует дизайн-токены хоста в стиле shadcn — HSL-КАНАЛЫ "H S% L%" (НЕ hex!),
+       т.к. внутри оборачивает их в hsl(var(--primary)). Hex здесь сломал бы hsl() → невидимые пузыри. */
+    :root {
+      --primary: 221 83% 53%;              /* синий бренд-цвет: пузыри пользователя + кнопка/FAB */
+      --primary-foreground: 210 40% 98%;   /* текст на --primary */
+    }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; color: #111; background: #f6f7f9; }
+    header { background: #111827; color: #fff; padding: 16px 24px; font-size: 18px; }
+    main { max-width: 760px; margin: 48px auto; padding: 0 20px; line-height: 1.6; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 28px; }
+    h1 { margin-top: 0; }
+    code { background: #eef2ff; padding: 2px 6px; border-radius: 5px; font-size: 90%; }
+    a { color: #2563eb; }
+    .hint { color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header><strong>Acme</strong> — демо-продукт</header>
+  <main>
+    <div class="card">
+      <h1>Тестовая страница с виджетом Supportal</h1>
+      <p>Виджет поддержки встроен в страницу — кнопка <strong>💬</strong> внизу слева.
+         Откройте её и напишите сообщение.</p>
+      <p><strong>Telegram замокан</strong>: ничего не уходит в реальный бот. Чтобы ответить
+         «как оператор», откройте <a href="/operator" target="_blank">консоль оператора</a>
+         (имитация топика Telegram) и ответьте — ответ прилетит в виджет через ~4 c (polling).
+         Там же можно отредактировать или отозвать ответ и увидеть, как правка синхронизируется в виджете.</p>
+      <p class="hint">Токен виджета чеканит демо-эндпоинт <code>POST /support/config</code>;
+         API виджета — под <code>/support-api/v1/widget/*</code> (в проде этот путь даёт reverse-proxy).</p>
+    </div>
+  </main>
+  <script src="/static/widget.js"></script>
+</body>
+</html>
