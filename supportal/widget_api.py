@@ -10,19 +10,31 @@ sends the last id it has seen and receives everything newer.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .flags import Flags
 from .models import IngressMessage, WidgetMessage, WidgetPoll
 from .ratelimit import limiter
 from .relay import Relay
-from .settings import get_bool, get_int
+from .settings import get_bool, get_float, get_int
 from .tokens import verify_widget_token
+
+
+def _build_poll(rows, since: int) -> WidgetPoll:
+    """Feed rows → a WidgetPoll payload (shared by GET /messages and the SSE stream)."""
+    items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
+                           ts=m.created_at, deleted=m.deleted, kind=m.kind, read=m.read,
+                           attachment_id=m.attachment_id,
+                           attachment_name=m.attachment_name, attachment_mime=m.attachment_mime)
+             for m in rows]
+    return WidgetPoll(messages=items, cursor=rows[-1].seq if rows else since)
 
 _LOG = logging.getLogger("supportal.widget")
 
@@ -108,13 +120,40 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
     async def messages(since: int = 0, authorization: str = Header("")) -> WidgetPoll:
         user_ref = _auth(authorization, widget_secret)
         rows = relay.changes_since(user_ref, since)   # new + edited + deleted (seq cursor)
-        items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
-                               ts=m.created_at, deleted=m.deleted, kind=m.kind, read=m.read,
-                               attachment_id=m.attachment_id,
-                               attachment_name=m.attachment_name, attachment_mime=m.attachment_mime)
-                 for m in rows]
-        cursor = rows[-1].seq if rows else since
-        return WidgetPoll(messages=items, cursor=cursor)
+        return _build_poll(rows, since)
+
+    @router.get("/stream", summary="Server-Sent Events stream of feed changes (feature SUPPORT_SSE)")
+    async def stream(request: Request, since: int = 0, token: str = "") -> StreamingResponse:
+        """SSE transport (feature SUPPORT_SSE): the same WidgetPoll payloads as GET /messages, pushed as the
+        server detects changes (a short server-side poll, default 1s) over one long-lived connection → lower
+        latency than widget polling. The contract is unchanged; the widget falls back to polling when off.
+
+        Auth is via `?token=` (EventSource can't set the Bearer header), verified like the other routes."""
+        if not get_bool(Flags.SSE, False):
+            raise HTTPException(status_code=404, detail="sse disabled")
+        user_ref = verify_widget_token(token, widget_secret)
+        if not user_ref:
+            raise HTTPException(status_code=401, detail="bad or expired token")
+        interval = max(0.1, get_float(Flags.SSE_INTERVAL, 1.0))
+
+        async def _events():
+            cursor = since
+            _LOG.info("[widget] sse open user=%s since=%d", user_ref[:8], since)
+            try:
+                while not await request.is_disconnected():
+                    rows = relay.changes_since(user_ref, cursor)
+                    if rows:
+                        poll = _build_poll(rows, cursor)
+                        cursor = poll.cursor
+                        yield f"data: {poll.model_dump_json()}\n\n"
+                    else:
+                        yield ": ping\n\n"          # keepalive comment (no event) so proxies hold the connection
+                    await asyncio.sleep(interval)
+            finally:
+                _LOG.info("[widget] sse close user=%s", user_ref[:8])
+
+        return StreamingResponse(_events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @router.post("/read", summary="Report read position (feature SUPPORT_RECEIPTS)")
     async def read(body: WidgetRead, authorization: str = Header("")) -> dict:

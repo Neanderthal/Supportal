@@ -131,6 +131,18 @@ them. If the KB covers the question, the answer is posted into the user's feed (
 - The demo ships two short Spanish KB docs (`examples/demo/kb/`) and stubs the LLM call offline with a keyword
   matcher so it works without an API key — try asking about *horario* or *contraseña* in the widget.
 
+## SSE transport (feature `SUPPORT_SSE`, default off)
+Lower-latency delivery: instead of the widget polling every ~4s, it opens one long-lived `EventSource` to
+`GET /v1/widget/stream` and the relay **pushes** feed changes as it detects them (a short server-side poll,
+`SUPPORT_SSE_INTERVAL`, default 1s). The payload and reconciliation are identical to polling — the contract is
+unchanged — so the widget transparently **falls back to polling** when SSE is off, unavailable, or errors.
+
+- `/support/config` should report `"sse": true` so the widget opens the stream (and still falls back if it fails).
+- EventSource can't send the `Authorization` header, so the token rides the query string (same short-lived token);
+  on expiry the stream errors, the widget refreshes the token and reconnects, then gives up to polling after a few tries.
+- Reverse proxies must not buffer the stream (the relay sets `X-Accel-Buffering: no`; for nginx also `proxy_buffering off`).
+- The demo enables it (`SUPPORT_SSE_INTERVAL=0.5`), so an operator reply appears almost immediately instead of after ~4s.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

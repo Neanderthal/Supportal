@@ -37,6 +37,13 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 - `seen` — how many operator messages were newly marked read. Feature off → `{"ok": true, "seen": 0}` (no-op). Idempotent.
 - The product should advertise `receipts: true` in `POST /support/config` for the widget to report reads + show delivered ticks.
 
+**SSE stream:** `GET /v1/widget/stream?since=<seq>&token=<token>` (feature `SUPPORT_SSE`, default off)
+- `text/event-stream`. Each `data:` event is the **same `WidgetPoll` payload** as `GET /messages`, pushed as the server
+  detects changes (a short server-side poll, default 1s) over one long-lived connection → lower latency than widget polling.
+- Auth is via the `?token=` query param (EventSource can't set the `Authorization` header); `:` comment lines are keepalives.
+- The widget uses `EventSource` when `sse: true` is advertised in `/support/config` and falls back to polling when off/unavailable.
+- `404` — feature off; `401` — bad/expired token.
+
 **CSAT rating:** `POST /v1/widget/csat` (feature `SUPPORT_CSAT`, default off)
 ```json
 {"score": 5, "comment": "fast and helpful"}        →  {"ok": true, "message_id": 31}

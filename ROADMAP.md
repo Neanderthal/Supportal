@@ -44,7 +44,7 @@ maturity as an open‑source platform.
 
 ## v0.3 — responsiveness & operator convenience
 
-- [ ] 🧩 **SSE transport** alongside polling (lower latency; graduates a v1 non‑goal). Contract preserved.
+- [x] 🧩 **SSE transport** alongside polling (lower latency; graduates a v1 non‑goal) — `SUPPORT_SSE`, default off. Contract preserved; falls back to polling.
 - [x] 🧩 **Delivery / read status** — `SUPPORT_RECEIPTS`, default off (widget delivered tick + 👀 "seen" reaction in Telegram).
       (Typing indicator deferred: operator→user typing isn't reliably available via the Bot API.)
 - [x] 🧩 **CSAT / rating** after `/close` (widget buttons → feed row / log) — `SUPPORT_CSAT`, default off.
