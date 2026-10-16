@@ -32,6 +32,13 @@ SUPPORT_BUSINESS_HOURS: off
 # SUPPORT_HOURS_TZ: Europe/Moscow           # IANA timezone; default UTC
 # SUPPORT_AWAY_MESSAGE: Thanks for reaching out! We're away right now and will reply during business hours.
 
+# Canned responses: the operator sends a preset reply by typing "/c <key>" in the topic ("/c" alone lists
+# the keys). Replies are a key→text map (here a YAML mapping; via env a "k=v;k=v" string). Default: off.
+SUPPORT_CANNED: off
+# SUPPORT_CANNED_REPLIES:
+#   greeting: "Hi! Thanks for reaching out — how can I help?"
+#   hours: "We're open Mon–Fri, 9:00–18:00."
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

@@ -43,6 +43,7 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 - **`/clear`** → the user's entire feed is marked `deleted` + the topic is deleted (`deleteForumTopic`) + the ticket is
   reset → the widget clears, and the next message creates a fresh topic;
 - **`/help`** → the bot prints a command hint into the topic (it does not go to the user's feed);
+- **`/c <key>`** → send a canned reply (feature `SUPPORT_CANNED`); `/c` with no key lists the configured keys in the topic;
 - **`/close`** → close the ticket (with `SUPPORT_CSAT` on, the user is then shown a rating prompt — see `POST /v1/widget/csat`).
 
 ## 1. Product → relay: `POST /v1/messages` (contour B)

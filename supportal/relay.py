@@ -12,7 +12,7 @@ import time
 
 from .hours import is_within
 from .models import IngressMessage, IngressResult, OperatorEvent
-from .settings import get, get_bool
+from .settings import get, get_bool, get_dict
 from .store import Store
 from .telegram_ops import TelegramOps
 
@@ -184,9 +184,12 @@ class Relay:
             _LOG.info("[del] tg_msg=%s recalled (ticket=%s)", tg_message_id, row.ticket_id)
 
     async def on_operator_command(self, thread_id: int, command: str, operator: str) -> None:
-        """Operator commands in the topic: /close — close the ticket; /clear — clear both sides (feed + topic)."""
+        """Operator commands in the topic: /close — close; /clear — clear both sides; /c <key> — canned reply."""
         ticket = self._store.get_by_thread(thread_id)
         if not ticket:
+            return
+        if command == "/c" or command.startswith("/c "):
+            await self._send_canned(ticket, command[2:].strip(), operator)
             return
         if command == "/close":
             self._store.close(ticket.ticket_id)
@@ -208,6 +211,30 @@ class Relay:
                              thread_id, exc_info=True)
             _LOG.info("[clear] ticket=%s cleared (%d feed rows, topic deleted, ticket reset)",
                       ticket.ticket_id, n)
+
+    async def _send_canned(self, ticket, key: str, operator: str) -> None:
+        """Feature SUPPORT_CANNED: expand "/c <key>" to a preset reply and send it to the user (feed `out`
+        row + the product callback), with a confirmation note into the topic. Unknown/empty key → list the
+        available keys into the topic (operator-facing, nothing goes to the user). Off → operator-facing hint."""
+        if not get_bool("SUPPORT_CANNED", False):
+            if ticket.thread_id is not None:
+                await self._tg.send_to_topic(ticket.thread_id, "🗂 Canned replies are disabled (SUPPORT_CANNED).")
+            return
+        replies = get_dict("SUPPORT_CANNED_REPLIES", {})
+        if not key or key not in replies:
+            available = ", ".join(sorted(replies)) or "(none configured)"
+            if ticket.thread_id is not None:
+                await self._tg.send_to_topic(ticket.thread_id, f"🗂 Canned replies: {available}")
+            _LOG.info("[canned] ticket=%s unknown/empty key=%r — listed %d keys", ticket.ticket_id, key, len(replies))
+            return
+        text = replies[key]
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, text)
+        if ticket.thread_id is not None:
+            await self._tg.send_to_topic(ticket.thread_id, f"↩️ (canned: {key}) {text}")
+        await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
+                                           ticket_id=ticket.ticket_id, text=text, operator=operator))
+        self._store.touch(ticket.ticket_id)
+        _LOG.info("[canned] ticket=%s key=%s len=%dchars", ticket.ticket_id, key, len(text))
 
     def _header(self, msg: IngressMessage) -> str:
         """Message header in the topic: who is writing + context (product/page). Not a secret."""
