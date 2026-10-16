@@ -16,6 +16,8 @@ class Flags:
     CANNED = "SUPPORT_CANNED"
     BUSINESS_HOURS = "SUPPORT_BUSINESS_HOURS"
     RECEIPTS = "SUPPORT_RECEIPTS"
+    OPENAPI = "SUPPORT_OPENAPI"       # read at startup (app.py), not hot
+    GDPR = "SUPPORT_GDPR"
 
     # Values (read with settings.get_int / get / get_dict).
     RATE_LIMIT_MAX = "SUPPORT_RATE_LIMIT_MAX"

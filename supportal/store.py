@@ -13,6 +13,7 @@ own connection — is deferred until attachment volume justifies it.
 """
 from __future__ import annotations
 
+import base64
 import sqlite3
 import time
 import uuid
@@ -374,3 +375,36 @@ class Store:
             (user_ref, up_to_seq))
         self._conn.commit()
         return [r["tg_message_id"] for r in rows if r["tg_message_id"]]
+
+    # ── GDPR: export / erase a user's data by user_ref (feature SUPPORT_GDPR) ────
+    def export_user(self, user_ref: str) -> dict:
+        """Everything stored for a user_ref: their tickets, the full message feed, and attachments
+        (bytes base64-encoded). A data-subject access export — the caller returns it over an authorized channel."""
+        tickets = [dict(r) for r in self._conn.execute(
+            "SELECT * FROM tickets WHERE user_ref=? ORDER BY created_at", (user_ref,)).fetchall()]
+        messages = [dict(r) for r in self._conn.execute(
+            "SELECT * FROM messages WHERE user_ref=? ORDER BY id", (user_ref,)).fetchall()]
+        attachments = []
+        for r in self._conn.execute(
+                "SELECT * FROM attachments WHERE user_ref=? ORDER BY id", (user_ref,)).fetchall():
+            a = dict(r)
+            a["data"] = base64.b64encode(bytes(r["data"])).decode("ascii") if r["data"] is not None else ""
+            attachments.append(a)
+        return {"user_ref": user_ref, "tickets": tickets, "messages": messages, "attachments": attachments}
+
+    def delete_user(self, user_ref: str) -> dict:
+        """Erase ALL of a user_ref's data (messages, attachments, tickets, outbox). Hard delete — irreversible.
+        Returns the per-table row counts removed. (The Telegram topic, if any, is the operator's side —
+        the relay deletes it separately when it has the thread id.)"""
+        counts = {}
+        for table in ("messages", "attachments", "tickets", "outbox"):
+            cur = self._conn.execute(f"DELETE FROM {table} WHERE user_ref=?", (user_ref,))
+            counts[table] = cur.rowcount
+        self._conn.commit()
+        return counts
+
+    def thread_ids_for_user(self, user_ref: str) -> list[int]:
+        """The user's Telegram thread ids (so the relay can delete the topics as part of a GDPR erase)."""
+        rows = self._conn.execute(
+            "SELECT thread_id FROM tickets WHERE user_ref=? AND thread_id IS NOT NULL", (user_ref,)).fetchall()
+        return [r["thread_id"] for r in rows]

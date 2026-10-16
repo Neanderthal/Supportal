@@ -50,6 +50,9 @@ All notable changes to this project are documented here. The format is based on
   with routes tagged `widget` / `product` / `health` (summaries + response models). Read at startup.
 - Reference product adapter (`examples/product_adapter.py`): a runnable contour-B example — signs messages to
   the ingress and verifies the operator-reply callback, reporting `delivered` for outbox retry.
+- GDPR export / erase (`SUPPORT_GDPR`, default off): `POST /v1/admin/export|delete {user_ref}` (HMAC, contour B)
+  export a user's tickets/messages/attachments (base64) or hard-delete them + their Telegram topics
+  (`store.export_user`/`delete_user`/`thread_ids_for_user`). The demo page has Export/Delete buttons.
 
 ### Changed
 - Smaller architecture-review cleanups (#8): added `supportal/flags.py` — feature-flag/setting **names** as

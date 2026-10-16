@@ -48,6 +48,10 @@ SUPPORT_RECEIPTS: off
 # behind the product's reverse-proxy). ⚠️ Read at STARTUP only — change it, then restart the service.
 SUPPORT_OPENAPI: off
 
+# GDPR data-subject operations: POST /v1/admin/export|delete {user_ref} (HMAC-signed, contour B) export or
+# hard-erase everything stored for a user_ref (messages, attachments, tickets, Telegram topics). Default: off.
+SUPPORT_GDPR: off
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

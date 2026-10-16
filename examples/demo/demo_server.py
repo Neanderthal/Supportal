@@ -47,6 +47,7 @@ os.environ.setdefault("SUPPORT_CANNED", "on")
 os.environ.setdefault("SUPPORT_CANNED_REPLIES",
                       "saludo=¡Hola! ¿En qué puedo ayudarte?;horario=Atendemos de lunes a viernes, 9:00–18:00.")
 os.environ.setdefault("SUPPORT_RECEIPTS", "on")   # read receipts: ✓ delivered + the operator console shows "seen"
+os.environ.setdefault("SUPPORT_GDPR", "on")       # GDPR export/erase buttons on the user page
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
@@ -238,6 +239,20 @@ async def op_command(body: CommandIn) -> dict:
         raise HTTPException(status_code=404, detail="unknown thread")
     await relay.on_operator_command(body.thread_id, body.command.strip(), "Operator (demo)")
     return {"ok": True}
+
+
+# ── GDPR (stands in for the product's data-subject endpoints; HMAC-gated in production) ────
+@app.post("/demo/export")
+async def demo_export() -> dict:
+    """Export everything stored for DEMO_USER (feature SUPPORT_GDPR)."""
+    return relay.export_user(DEMO_USER) or {"error": "gdpr disabled"}
+
+
+@app.post("/demo/delete")
+async def demo_delete() -> dict:
+    """Erase everything stored for DEMO_USER + their topics (feature SUPPORT_GDPR)."""
+    counts = await relay.delete_user(DEMO_USER)
+    return {"ok": counts is not None, "deleted": counts}
 
 
 # ── pages + widget static assets ────────────────────────────────────────────────────────
