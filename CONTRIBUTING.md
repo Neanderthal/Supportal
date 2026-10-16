@@ -1,6 +1,6 @@
-# Contributing to dali-support
+# Contributing to Supportal
 
-Thanks for your interest in improving `dali-support`! This guide covers the dev setup,
+Thanks for your interest in improving `supportal`! This guide covers the dev setup,
 conventions, and the pull‑request workflow.
 
 ## Development setup
@@ -10,7 +10,7 @@ The project uses [uv](https://docs.astral.sh/uv/) and targets **Python 3.12+**.
 ```bash
 uv sync                                       # create venv + install deps (incl. dev)
 cp .env.example .env                          # fill in secrets for a real run
-uv run uvicorn dali_support.app:app --port 8500
+uv run uvicorn supportal.app:app --port 8500
 ```
 
 ## Tests and linting

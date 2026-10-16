@@ -9,10 +9,10 @@ import os, tempfile
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from dali_support.api import build_router
-from dali_support.models import IngressMessage
-from dali_support.relay import Relay, sign
-from dali_support.store import Store
+from supportal.api import build_router
+from supportal.models import IngressMessage
+from supportal.relay import Relay, sign
+from supportal.store import Store
 
 _INGRESS_SECRET = "ing-secret"
 
@@ -38,7 +38,7 @@ class _FakeTG:
 
 
 def _client(tg: _FakeTG) -> TestClient:
-    path = os.path.join(tempfile.mkdtemp(prefix="dali_support_"), "t.db")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_"), "t.db")
     store = Store(f"sqlite:///{path}")
     store.bootstrap()
     relay = Relay(store, tg, "http://product/support/push", "cb-secret")
@@ -50,7 +50,7 @@ def _client(tg: _FakeTG) -> TestClient:
 def _post(client: TestClient, msg: IngressMessage, secret: str = _INGRESS_SECRET):
     body = msg.model_dump_json().encode()
     return client.post("/v1/messages", content=body,
-                       headers={"Content-Type": "application/json", "X-Dali-Signature": sign(body, secret)})
+                       headers={"Content-Type": "application/json", "X-Supportal-Signature": sign(body, secret)})
 
 
 def test_ingress_valid_signature_creates_ticket_and_topic():
@@ -71,7 +71,7 @@ def test_ingress_valid_signature_creates_ticket_and_topic():
 def test_ingress_bad_signature_401():
     client = _client(_FakeTG())
     body = IngressMessage(user_ref="eng@x", text="x").model_dump_json().encode()
-    r = client.post("/v1/messages", content=body, headers={"X-Dali-Signature": "deadbeef"})
+    r = client.post("/v1/messages", content=body, headers={"X-Supportal-Signature": "deadbeef"})
     assert r.status_code == 401
 
 
@@ -97,4 +97,4 @@ def test_ingress_reuses_open_ticket_one_topic():
 def test_health():
     client = _client(_FakeTG())
     r = client.get("/health")
-    assert r.status_code == 200 and r.json() == {"status": "ok", "service": "dali-support"}
+    assert r.status_code == 200 and r.json() == {"status": "ok", "service": "supportal"}

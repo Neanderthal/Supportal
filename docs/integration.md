@@ -3,7 +3,7 @@
 ## Обязанности адаптера продукта
 Relay не зависит от продукта. Встраивающая сторона пишет тонкий адаптер, который:
 1. **Исходящее:** сообщение пользователя из чата → `POST {RELAY}/v1/messages` с `{user_ref, display_name,
-   text, meta}` + заголовок `X-Dali-Signature` (HMAC на `SUPPORT_INGRESS_SECRET`).
+   text, meta}` + заголовок `X-Supportal-Signature` (HMAC на `SUPPORT_INGRESS_SECRET`).
 2. **Входящее:** принять callback от relay, проверить HMAC (`SUPPORT_CALLBACK_SECRET`), по `user_ref`
    доставить `text` в **живую** сессию пользователя; сессии нет → сохранить и отдать при следующем входе.
 3. **Личность:** `user_ref` — стабильный ключ (нормализованный логин). Один ключ на пользователя во всех
@@ -23,11 +23,11 @@ Relay не зависит от продукта. Встраивающая сто
 ## Хранилище
 Дефолт — SQLite (`sqlite:///…`, самодостаточно). Для многопользовательского/отказоустойчивого контура
 реализовать класс с интерфейсом `store.Store` поверх Postgres (та же таблица `tickets`) и подставить его
-в `app.create_app`. Схема в `dali_support/store.py`.
+в `app.create_app`. Схема в `supportal/store.py`.
 
 ## Развёртывание рядом с продуктом
 - Co-location: сервис в compose продукта, той же docker-сети. Ingress и callback ходят по внутренним
-  именам (`http://dali-support:8500`, `http://<продукт>/…/push`). Публичных маршрутов добавлять не нужно.
+  именам (`http://supportal:8500`, `http://<продукт>/…/push`). Публичных маршрутов добавлять не нужно.
 - Telegram — egress long-polling. ⚠️ В некоторых сетях/облаках `api.telegram.org` достижим **только по
   IPv6**, а docker-сеть обычно без IPv6. Два пути: (а) включить IPv6-egress контейнеру; (б) **`SUPPORT_TG_PROXY`** —
   HTTP CONNECT forward-proxy на внешнем хосте с IPv4-egress к Telegram. Прокси стоит залочить по IP релея +

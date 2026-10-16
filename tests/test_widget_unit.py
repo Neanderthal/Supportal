@@ -11,10 +11,10 @@ import tempfile
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from dali_support.relay import Relay
-from dali_support.store import Store
-from dali_support.tokens import mint_widget_token, verify_widget_token
-from dali_support.widget_api import build_widget_router
+from supportal.relay import Relay
+from supportal.store import Store
+from supportal.tokens import mint_widget_token, verify_widget_token
+from supportal.widget_api import build_widget_router
 
 _SECRET = "widget-secret-xyz"
 
@@ -40,7 +40,7 @@ class _FakeTG:
 
 
 def _build(callback_url: str = ""):
-    path = os.path.join(tempfile.mkdtemp(prefix="dali_widget_"), "t.db")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_widget_"), "t.db")
     store = Store(f"sqlite:///{path}")
     store.bootstrap()
     tg = _FakeTG()

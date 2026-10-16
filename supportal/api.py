@@ -9,7 +9,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from .models import IngressMessage, IngressResult
 from .relay import Relay, sign
 
-_LOG = logging.getLogger("dali.support.api")
+_LOG = logging.getLogger("supportal.api")
 
 
 def build_router(relay: Relay, ingress_secret: str) -> APIRouter:
@@ -17,12 +17,12 @@ def build_router(relay: Relay, ingress_secret: str) -> APIRouter:
 
     @router.get("/health")
     async def health() -> dict:
-        return {"status": "ok", "service": "dali-support"}
+        return {"status": "ok", "service": "supportal"}
 
     @router.post("/v1/messages", response_model=IngressResult)
-    async def ingress(request: Request, x_dali_signature: str = Header("")) -> IngressResult:
+    async def ingress(request: Request, x_supportal_signature: str = Header("")) -> IngressResult:
         body = await request.body()
-        if not ingress_secret or not hmac.compare_digest(x_dali_signature, sign(body, ingress_secret)):
+        if not ingress_secret or not hmac.compare_digest(x_supportal_signature, sign(body, ingress_secret)):
             _LOG.warning("[api] ingress с неверной подписью — 401")
             raise HTTPException(status_code=401, detail="bad signature")
         return await relay.ingress(IngressMessage.model_validate_json(body))

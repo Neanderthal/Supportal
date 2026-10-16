@@ -1,4 +1,4 @@
-// dali-support — встраиваемый виджет поддержки (ванильный JS, без зависимостей).
+// supportal — встраиваемый виджет поддержки (ванильный JS, без зависимостей).
 //
 // Самодостаточный: рисует плавающую кнопку «💬» (снизу слева) + выдвижную панель справа, ведёт свою
 // ленту, общается НАПРЯМУЮ с relay по токену. В продукт встраивается одним тегом <script> (+ widget.css);
@@ -15,8 +15,8 @@
 // Текст оператора приходит из Telegram → вставляем ТОЛЬКО как textContent (без innerHTML).
 (function () {
   "use strict";
-  if (window.__daliSupportInit) return;      // один инстанс на страницу
-  window.__daliSupportInit = true;
+  if (window.__supportalInit) return;      // один инстанс на страницу
+  window.__supportalInit = true;
 
   var CONFIG_URL = "/support/config";          // same-origin эндпоинт продукта (отдаёт токен)
   var POLL_VISIBLE = 4000, POLL_HIDDEN = 20000;
@@ -106,16 +106,16 @@
 
   function renderBubble(m) {
     var row = document.createElement("div");
-    row.className = "dali-msg " + (m.direction === "in" ? "dali-in" : "dali-out");
+    row.className = "supportal-msg " + (m.direction === "in" ? "supportal-in" : "supportal-out");
     row.dataset.mid = m.id;
     if (m.direction === "out" && m.author) {
       var who = document.createElement("div");
-      who.className = "dali-msg-author";
+      who.className = "supportal-msg-author";
       who.textContent = m.author;            // имя оператора — textContent (без HTML)
       row.appendChild(who);
     }
     var bub = document.createElement("div");
-    bub.className = "dali-bubble";
+    bub.className = "supportal-bubble";
     bub.textContent = m.text || "";          // ВАЖНО: текст из Telegram → только textContent
     row.appendChild(bub);
     els.list.appendChild(row);
@@ -132,7 +132,7 @@
   function removeBubble(id) {
     var bub = bubbles[id];
     if (!bub) return false;
-    var row = bub.parentNode;                // .dali-msg (внешняя обёртка)
+    var row = bub.parentNode;                // .supportal-msg (внешняя обёртка)
     if (row && row.parentNode) row.parentNode.removeChild(row);
     delete bubbles[id];
     return true;
@@ -140,7 +140,7 @@
 
   function renderNote(text) {
     var n = document.createElement("div");
-    n.className = "dali-note";
+    n.className = "supportal-note";
     n.textContent = text;
     els.list.appendChild(n);
     if (isOpen) scrollToBottom();
@@ -148,7 +148,7 @@
 
   // Показать приветствие, когда лента пуста (в т.ч. после /clear), скрыть — когда есть сообщения.
   function syncGreeting() {
-    if (els.greeting) els.greeting.style.display = els.list.querySelector(".dali-msg") ? "none" : "";
+    if (els.greeting) els.greeting.style.display = els.list.querySelector(".supportal-msg") ? "none" : "";
   }
   function scrollToBottom() { els.list.scrollTop = els.list.scrollHeight; }
   function updateBadge() {
@@ -195,17 +195,17 @@
 
   function build() {
     var root = document.createElement("div");
-    root.id = "dali-support-root";
+    root.id = "supportal-root";
     root.innerHTML =
-      '<button id="dali-support-fab" type="button" aria-label="Поддержка" aria-expanded="false">'
-      + CHAT_ICON + '<span class="dali-fab-badge" style="display:none"></span></button>'
-      + '<section class="dali-support-drawer" role="dialog" aria-label="Чат поддержки">'
-      + '  <header class="dali-drawer-head"><span class="dali-drawer-title">Поддержка</span>'
-      + '    <button class="dali-drawer-close" type="button" aria-label="Закрыть">&times;</button></header>'
-      + '  <div class="dali-msg-list"><div class="dali-greeting">Опишите вопрос — ответит оператор поддержки.'
+      '<button id="supportal-fab" type="button" aria-label="Поддержка" aria-expanded="false">'
+      + CHAT_ICON + '<span class="supportal-fab-badge" style="display:none"></span></button>'
+      + '<section class="supportal-drawer" role="dialog" aria-label="Чат поддержки">'
+      + '  <header class="supportal-drawer-head"><span class="supportal-drawer-title">Поддержка</span>'
+      + '    <button class="supportal-drawer-close" type="button" aria-label="Закрыть">&times;</button></header>'
+      + '  <div class="supportal-msg-list"><div class="supportal-greeting">Опишите вопрос — ответит оператор поддержки.'
       + ' Ответ придёт сюда, можно не ждать на странице.</div></div>'
-      + '  <form class="dali-composer"><textarea rows="1" placeholder="Сообщение…" class="dali-input"></textarea>'
-      + '    <button type="submit" class="dali-send" aria-label="Отправить">'
+      + '  <form class="supportal-composer"><textarea rows="1" placeholder="Сообщение…" class="supportal-input"></textarea>'
+      + '    <button type="submit" class="supportal-send" aria-label="Отправить">'
       + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"'
       + ' stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/>'
       + '<polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button></form>'
@@ -213,15 +213,15 @@
     document.body.appendChild(root);
 
     els.root = root;
-    els.fab = root.querySelector("#dali-support-fab");
-    els.badge = root.querySelector(".dali-fab-badge");
-    els.list = root.querySelector(".dali-msg-list");
-    els.greeting = root.querySelector(".dali-greeting");
-    els.input = root.querySelector(".dali-input");
-    els.form = root.querySelector(".dali-composer");
+    els.fab = root.querySelector("#supportal-fab");
+    els.badge = root.querySelector(".supportal-fab-badge");
+    els.list = root.querySelector(".supportal-msg-list");
+    els.greeting = root.querySelector(".supportal-greeting");
+    els.input = root.querySelector(".supportal-input");
+    els.form = root.querySelector(".supportal-composer");
 
     els.fab.addEventListener("click", function () { setOpen(!isOpen); });
-    root.querySelector(".dali-drawer-close").addEventListener("click", function () { setOpen(false); });
+    root.querySelector(".supportal-drawer-close").addEventListener("click", function () { setOpen(false); });
     els.form.addEventListener("submit", function (e) { e.preventDefault(); submit(); });
     els.input.addEventListener("input", autoGrow);
     els.input.addEventListener("keydown", function (e) {

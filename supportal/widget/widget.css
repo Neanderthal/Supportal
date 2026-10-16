@@ -1,8 +1,8 @@
-/* dali-support — стили встраиваемого виджета поддержки. Всё под #dali-support-root (не влияет на хост).
+/* supportal — стили встраиваемого виджета поддержки. Всё под #supportal-root (не влияет на хост).
    Используем дизайн-токены хоста (--primary/--card/… как в shadcn) с ФОЛБЭКАМИ → тема/тёмный режим
    подхватываются у продукта автоматически, а без токенов виджет остаётся вменяемым (переиспользуемость). */
 
-#dali-support-root {
+#supportal-root {
   font-family: inherit;
   --ds-primary: var(--primary, 221 72% 40%);
   --ds-primary-fg: var(--primary-foreground, 210 40% 98%);
@@ -15,7 +15,7 @@
 }
 
 /* ── плавающая кнопка (снизу слева) ─────────────────────────────────────────── */
-#dali-support-fab {
+#supportal-fab {
   position: fixed; left: 20px; bottom: 20px;
   width: 56px; height: 56px; border-radius: 9999px; border: none;
   background: hsl(var(--ds-primary)); color: hsl(var(--ds-primary-fg));
@@ -23,9 +23,9 @@
   box-shadow: 0 6px 20px hsl(var(--ds-fg) / 0.22); z-index: 2147483001;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-#dali-support-fab:hover { transform: translateY(-2px); box-shadow: 0 8px 26px hsl(var(--ds-fg) / 0.28); }
-#dali-support-fab:active { transform: translateY(0); }
-.dali-fab-badge {
+#supportal-fab:hover { transform: translateY(-2px); box-shadow: 0 8px 26px hsl(var(--ds-fg) / 0.28); }
+#supportal-fab:active { transform: translateY(0); }
+.supportal-fab-badge {
   position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px;
   border-radius: 10px; background: hsl(0 72% 51%); color: #fff;
   font-size: 11px; font-weight: 700; line-height: 20px; text-align: center;
@@ -33,63 +33,63 @@
 }
 
 /* ── выдвижная панель (справа) ──────────────────────────────────────────────── */
-.dali-support-drawer {
+.supportal-drawer {
   position: fixed; top: 0; right: 0; height: 100dvh; width: 380px; max-width: 92vw;
   background: hsl(var(--ds-card)); color: hsl(var(--ds-fg));
   border-left: 1px solid hsl(var(--ds-border)); box-shadow: -8px 0 30px hsl(var(--ds-fg) / 0.16);
   transform: translateX(100%); transition: transform 0.22s ease; pointer-events: none;
   display: flex; flex-direction: column; z-index: 2147483000;
 }
-#dali-support-root.open .dali-support-drawer { transform: none; pointer-events: auto; }
+#supportal-root.open .supportal-drawer { transform: none; pointer-events: auto; }
 
-.dali-drawer-head {
+.supportal-drawer-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.7rem 0.9rem; border-bottom: 1px solid hsl(var(--ds-border)); flex: 0 0 auto;
 }
-.dali-drawer-title { font-weight: 650; font-size: 0.95rem; }
-.dali-drawer-close {
+.supportal-drawer-title { font-weight: 650; font-size: 0.95rem; }
+.supportal-drawer-close {
   border: none; background: transparent; color: hsl(var(--ds-muted-fg));
   font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0 0.25rem;
 }
-.dali-drawer-close:hover { color: hsl(var(--ds-fg)); }
+.supportal-drawer-close:hover { color: hsl(var(--ds-fg)); }
 
-.dali-msg-list {
+.supportal-msg-list {
   flex: 1 1 auto; overflow-y: auto; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.5rem;
 }
-.dali-greeting { color: hsl(var(--ds-muted-fg)); font-size: 0.85rem; line-height: 1.5; margin: 0.25rem 0; }
+.supportal-greeting { color: hsl(var(--ds-muted-fg)); font-size: 0.85rem; line-height: 1.5; margin: 0.25rem 0; }
 
-.dali-msg { display: flex; flex-direction: column; max-width: 85%; }
-.dali-msg.dali-in { align-self: flex-end; align-items: flex-end; }
-.dali-msg.dali-out { align-self: flex-start; align-items: flex-start; }
-.dali-msg-author { font-size: 0.72rem; color: hsl(var(--ds-muted-fg)); margin: 0 0.3rem 0.1rem; }
-.dali-bubble {
+.supportal-msg { display: flex; flex-direction: column; max-width: 85%; }
+.supportal-msg.supportal-in { align-self: flex-end; align-items: flex-end; }
+.supportal-msg.supportal-out { align-self: flex-start; align-items: flex-start; }
+.supportal-msg-author { font-size: 0.72rem; color: hsl(var(--ds-muted-fg)); margin: 0 0.3rem 0.1rem; }
+.supportal-bubble {
   padding: 0.5rem 0.7rem; border-radius: var(--ds-radius); font-size: 0.9rem; line-height: 1.45;
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
 }
-.dali-in .dali-bubble { background: hsl(var(--ds-primary)); color: hsl(var(--ds-primary-fg)); border-bottom-right-radius: 4px; }
-.dali-out .dali-bubble { background: hsl(var(--ds-muted)); color: hsl(var(--ds-fg)); border-bottom-left-radius: 4px; }
-.dali-note { align-self: center; color: hsl(var(--ds-muted-fg)); font-size: 0.8rem; font-style: italic; margin: 0.2rem 0; }
+.supportal-in .supportal-bubble { background: hsl(var(--ds-primary)); color: hsl(var(--ds-primary-fg)); border-bottom-right-radius: 4px; }
+.supportal-out .supportal-bubble { background: hsl(var(--ds-muted)); color: hsl(var(--ds-fg)); border-bottom-left-radius: 4px; }
+.supportal-note { align-self: center; color: hsl(var(--ds-muted-fg)); font-size: 0.8rem; font-style: italic; margin: 0.2rem 0; }
 
-.dali-composer {
+.supportal-composer {
   display: flex; align-items: flex-end; gap: 0.4rem; padding: 0.6rem;
   border-top: 1px solid hsl(var(--ds-border)); flex: 0 0 auto;
 }
-.dali-input {
+.supportal-input {
   flex: 1 1 auto; resize: none; max-height: 120px; padding: 0.5rem 0.6rem;
   border: 1px solid hsl(var(--ds-border)); border-radius: var(--ds-radius);
   background: hsl(var(--ds-card)); color: hsl(var(--ds-fg)); font-family: inherit; font-size: 0.9rem; line-height: 1.4;
   outline: none;
 }
-.dali-input:focus { border-color: hsl(var(--ds-primary)); }
-.dali-send {
+.supportal-input:focus { border-color: hsl(var(--ds-primary)); }
+.supportal-send {
   flex: 0 0 auto; width: 38px; height: 38px; border-radius: 9999px; border: none; cursor: pointer;
   background: hsl(var(--ds-primary)); color: hsl(var(--ds-primary-fg));
   display: flex; align-items: center; justify-content: center;
 }
-.dali-send:hover { filter: brightness(1.06); }
+.supportal-send:hover { filter: brightness(1.06); }
 
 /* Телефон: панель во весь экран; кнопку поднимаем над композером чата (он во всю ширину снизу). */
 @media (max-width: 640px) {
-  .dali-support-drawer { width: 100vw; max-width: none; }
-  #dali-support-fab { bottom: 84px; }
+  .supportal-drawer { width: 100vw; max-width: none; }
+  #supportal-fab { bottom: 84px; }
 }

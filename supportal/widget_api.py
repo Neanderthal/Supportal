@@ -18,7 +18,7 @@ from .models import IngressMessage, WidgetMessage, WidgetPoll
 from .relay import Relay
 from .tokens import verify_widget_token
 
-_LOG = logging.getLogger("dali.support.widget")
+_LOG = logging.getLogger("supportal.widget")
 
 
 class WidgetSend(BaseModel):
@@ -45,7 +45,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
             raise HTTPException(status_code=400, detail="empty text")
         # display_name/meta НЕ берём из браузера (не доверяем) — имя = user_ref, продукт помечаем сервером.
         res = await relay.ingress(IngressMessage(user_ref=user_ref, text=text, display_name=user_ref,
-                                                 meta={"product": "dali-widget"}))
+                                                 meta={"product": "supportal-widget"}))
         _LOG.info("[widget] send user=%s len=%dсимв mid=%d", user_ref[:8], len(text), res.message_id)
         return {"ok": True, "message_id": res.message_id}
 

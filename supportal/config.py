@@ -1,4 +1,4 @@
-"""Конфигурация dali-support (env → дефолт). Секреты — только через окружение/.env, не в коде."""
+"""Конфигурация supportal (env → дефолт). Секреты — только через окружение/.env, не в коде."""
 from __future__ import annotations
 
 import os
@@ -53,7 +53,7 @@ class Config:
             ingress_secret=_env("SUPPORT_INGRESS_SECRET"),
             widget_secret=_env("SUPPORT_WIDGET_SECRET"),
             allowed_origin=_env("SUPPORT_ALLOWED_ORIGIN"),
-            db_url=_env("SUPPORT_DB_URL", "sqlite:///./dali_support.db"),
+            db_url=_env("SUPPORT_DB_URL", "sqlite:///./supportal.db"),
             http_port=_env_int("SUPPORT_HTTP_PORT", 8500),
             outbox_retry_interval=_env_int("SUPPORT_OUTBOX_RETRY_INTERVAL", 30),
             outbox_ttl=_env_int("SUPPORT_OUTBOX_TTL", 86400),

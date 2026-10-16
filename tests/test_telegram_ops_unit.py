@@ -9,7 +9,7 @@ start_polling регистрирует 2 хэндлера и зовёт polling 
 import asyncio
 from types import SimpleNamespace
 
-from dali_support.telegram_ops import HELP_TEXT, TelegramOps, operator_name
+from supportal.telegram_ops import HELP_TEXT, TelegramOps, operator_name
 
 _DUMMY_TOKEN = "123456:abc"      # валиден по формату; сеть не трогается до вызова метода бота
 _GROUP_ID = -1001234567890
@@ -24,10 +24,10 @@ def test_operator_name_prefers_username_then_fullname_then_id():
 
 def test_proxy_builds_session_with_connector():
     # proxy задан → Bot строится с AiohttpSession поверх forward-proxy (egress к Telegram через внешний хост)
-    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID, proxy="http://dali:secret@85.234.107.135:48610")
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID, proxy="http://user:secret@proxy.example.com:1080")
     from aiogram.client.session.aiohttp import AiohttpSession
     assert isinstance(tg._bot.session, AiohttpSession)
-    assert getattr(tg._bot.session, "_proxy", None) == "http://dali:secret@85.234.107.135:48610"
+    assert getattr(tg._bot.session, "_proxy", None) == "http://user:secret@proxy.example.com:1080"
 
 
 def test_no_proxy_default_session():
@@ -87,7 +87,7 @@ def test_handlers_route_command_text_edit_delete():
                             command=SimpleNamespace(command="close")))
     # текст → on_message (с message_id)
     asyncio.run(text_handler(SimpleNamespace(message_thread_id=55, from_user=user,
-                                             text="проверьте сапун бака", message_id=99)))
+                                             text="проверьте настройки уведомлений", message_id=99)))
     # /del ОТВЕТОМ на сообщение msg_id=42 → on_delete(42); reply не на служебное (forum_topic_created=None)
     reply = SimpleNamespace(message_id=42, forum_topic_created=None)
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/del",
@@ -99,12 +99,12 @@ def test_handlers_route_command_text_edit_delete():
                             command=SimpleNamespace(command="del")))
     # редактирование сообщения msg_id=42 → on_edit
     asyncio.run(edit_handler(SimpleNamespace(message_thread_id=55, from_user=user,
-                                             text="проверьте сапун и уровень", message_id=42)))
+                                             text="проверьте настройки уведомлений и спам", message_id=42)))
 
     assert seen["cmd"] == [(55, "/close", "support1")]
-    assert seen["msg"] == [(55, "проверьте сапун бака", "support1", 99)]
+    assert seen["msg"] == [(55, "проверьте настройки уведомлений", "support1", 99)]
     assert seen["del"] == [42]                               # только валидный reply-таргет
-    assert seen["edit"] == [(42, "проверьте сапун и уровень")]
+    assert seen["edit"] == [(42, "проверьте настройки уведомлений и спам")]
 
 
 def test_clear_routes_to_command_and_help_posts_to_topic():

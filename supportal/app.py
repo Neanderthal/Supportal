@@ -17,7 +17,7 @@ from .widget_api import build_widget_router
 
 logging.basicConfig(level=os.environ.get("SUPPORT_LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s %(message)s")
-_LOG = logging.getLogger("dali.support")
+_LOG = logging.getLogger("supportal")
 
 
 def create_app(config: Config | None = None) -> FastAPI:
@@ -57,7 +57,7 @@ def create_app(config: Config | None = None) -> FastAPI:
         poll.add_done_callback(_crash_logger("long-polling"))
         outbox = asyncio.create_task(_outbox_loop())
         outbox.add_done_callback(_crash_logger("outbox-retry"))
-        _LOG.info("[app] dali-support поднят: long-polling супергруппы + повтор outbox (период %dс)",
+        _LOG.info("[app] supportal поднят: long-polling супергруппы + повтор outbox (период %dс)",
                   cfg.outbox_retry_interval)
         try:
             yield
@@ -69,7 +69,7 @@ def create_app(config: Config | None = None) -> FastAPI:
                     await task
             await tg.close()
 
-    app = FastAPI(title="dali-support", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="supportal", version="0.1.0", lifespan=lifespan)
     app.include_router(build_router(relay, cfg.ingress_secret))
     # Публичный widget-API (token-gated) — поверхность браузерного виджета. В проде доступен через
     # reverse-proxy продукта (same-origin `/support-api/v1/widget/*`) → без CORS. CORS включаем ТОЛЬКО
@@ -82,6 +82,6 @@ def create_app(config: Config | None = None) -> FastAPI:
     return app
 
 
-# uvicorn dali_support.app:app — создаём только когда задан токен бота (иначе импорт пакета оффлайн-юнитами
+# uvicorn supportal.app:app — создаём только когда задан токен бота (иначе импорт пакета оффлайн-юнитами
 # не должен требовать Telegram-конфиг). Боевой запуск — всегда с заполненным .env.
 app = create_app() if os.environ.get("SUPPORT_TG_BOT_TOKEN") else None

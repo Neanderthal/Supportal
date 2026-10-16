@@ -22,7 +22,7 @@ Initial public release.
 - **Contour A — browser widget (primary):** token‑gated `/v1/widget/{send,messages}`
   (polling), short‑lived HMAC widget token (`tokens.py`), persistent `messages` feed
   with edit‑sync / `/del` / `/clear`, and a vanilla‑JS embeddable bundle
-  (`dali_support/widget/`).
+  (`supportal/widget/`).
 - **Contour B — via product (config‑gated):** ingress `POST /v1/messages` (HMAC),
   signed operator‑reply callback, and an outbox with backoff retry for offline users.
 - **Telegram side:** forum‑topic relay over long‑polling (one topic per ticket),
@@ -30,5 +30,5 @@ Initial public release.
 - SQLite storage by default with a `Store` interface that can be backed by Postgres.
 - Offline unit test suite and ruff linting.
 
-[Unreleased]: https://github.com/Neanderthal/dali-support/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Neanderthal/dali-support/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Neanderthal/supportal/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Neanderthal/supportal/releases/tag/v0.1.0

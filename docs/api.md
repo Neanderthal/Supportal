@@ -1,14 +1,14 @@
-# HTTP-контракт dali-support
+# HTTP-контракт Supportal
 
 Два контура: **(A) браузерный виджет напрямую** (ревизия 2026-10-16, основной) и **(B) через продукт**
 (прежняя server-push-модель, остаётся за конфигом). Тела A подписаны Bearer-токеном; тела B — HMAC-SHA256
-заголовком `X-Dali-Signature` (`hmac.compare_digest`).
+заголовком `X-Supportal-Signature` (`hmac.compare_digest`).
 
 ## 0. Браузерный виджет → relay (контур A — основной)
 
 Публичны через reverse-proxy продукта (same-origin `/support-api/v1/widget/*` → strip-prefix → relay). Авторизация —
 `Authorization: Bearer <token>`, где токен чеканит продукт (`{user_ref, exp}`, подпись `SUPPORT_WIDGET_SECRET`;
-схема — `dali_support/tokens.py`). `user_ref` — из токена (сервер), не из тела → анти-спуфинг.
+схема — `supportal/tokens.py`). `user_ref` — из токена (сервер), не из тела → анти-спуфинг.
 
 **Отправка:** `POST /v1/widget/send`
 ```json
@@ -89,5 +89,5 @@ server-push продукта он не знает — это целиком за
 
 ## Здоровье: `GET /health`
 ```json
-{"status": "ok", "service": "dali-support"}
+{"status": "ok", "service": "supportal"}
 ```
