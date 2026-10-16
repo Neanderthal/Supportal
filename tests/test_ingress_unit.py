@@ -92,6 +92,17 @@ def test_ingress_signed_but_malformed_body_422():
         assert r.status_code == 422
 
 
+def test_ingress_overlong_text_422():
+    # A signed body over the 4096-char cap → 422 (bound declared on the DTO), not a failed Telegram send.
+    import json
+    client = _client(_FakeTG())
+    body = json.dumps({"user_ref": "eng@x", "text": "x" * 5000}).encode()
+    r = client.post("/v1/messages", content=body,
+                    headers={"Content-Type": "application/json",
+                             "X-Supportal-Signature": sign(body, _INGRESS_SECRET)})
+    assert r.status_code == 422
+
+
 def test_ingress_reuses_open_ticket_one_topic():
     tg = _FakeTG()
     client = _client(tg)

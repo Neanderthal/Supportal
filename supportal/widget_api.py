@@ -57,14 +57,14 @@ def _rate_limited(user_ref: str) -> bool:
 
 
 class WidgetSend(BaseModel):
-    text: str = Field(..., description="User text from the widget.")
+    text: str = Field(..., max_length=4096, description="User text from the widget (Telegram caps a message at 4096 chars).")
     context: dict = Field(default_factory=dict,
                           description="Visitor context (url/title/custom); posted once into the topic when SUPPORT_VISITOR_CONTEXT is on.")
 
 
 class WidgetCsat(BaseModel):
     score: int = Field(..., ge=1, le=5, description="Satisfaction rating 1..5 (feature SUPPORT_CSAT).")
-    comment: str = Field("", description="Optional free-text comment.")
+    comment: str = Field("", max_length=500, description="Optional free-text comment (capped at 500 chars).")
 
 
 class WidgetRead(BaseModel):

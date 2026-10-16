@@ -134,6 +134,27 @@ def test_widget_empty_text_400():
     assert client.post("/v1/widget/send", json={"text": "   "}, headers=_bearer("eng@x")).status_code == 400
 
 
+def test_widget_send_overlong_text_422():
+    # Over the 4096-char Telegram cap → 422 at the DTO boundary (would otherwise fail the Telegram send).
+    _, _, _, client = _build()
+    r = client.post("/v1/widget/send", json={"text": "x" * 4097}, headers=_bearer("eng@x"))
+    assert r.status_code == 422
+    assert client.post("/v1/widget/send", json={"text": "x" * 4096}, headers=_bearer("eng@x")).status_code == 200
+
+
+def test_widget_csat_comment_length_bounded():
+    from pydantic import ValidationError
+
+    from supportal.widget_api import WidgetCsat
+    WidgetCsat(score=5, comment="x" * 500)                     # within bound OK
+    try:
+        WidgetCsat(score=5, comment="x" * 501)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("comment over 500 chars should be rejected")
+
+
 def test_operator_reply_poll_and_callback_dormant():
     relay, store, tg, client = _build(callback_url="")   # callback empty → _dispatch dormant
     client.post("/v1/widget/send", json={"text": "first"}, headers=_bearer("eng@x"))
