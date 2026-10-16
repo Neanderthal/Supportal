@@ -19,6 +19,9 @@ htmlcov/
 !.env.example
 *.db
 
+# Local feature-flag overrides (commit settings.yaml.example instead)
+settings.yaml
+
 # Editors / OS
 .idea/
 .vscode/

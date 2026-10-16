@@ -25,10 +25,11 @@ classifiers = [
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
-    "aiogram>=3.13",     # Telegram Bot API (forum topics, long-polling) — сторона оператора
-    "aiohttp-socks>=0.8",  # прокси-коннектор для aiogram (egress к Telegram через forward-proxy) — нужен, когда задан SUPPORT_TG_PROXY
-    "httpx>=0.27",       # callback продукту (ответ оператора → живая сессия пользователя)
-    "pydantic>=2.8",     # DTO HTTP-контракта (граница встраивания)
+    "aiogram>=3.13", # Telegram Bot API (forum topics, long-polling) — сторона оператора
+    "aiohttp-socks>=0.8", # прокси-коннектор для aiogram (egress к Telegram через forward-proxy) — нужен, когда задан SUPPORT_TG_PROXY
+    "httpx>=0.27", # callback продукту (ответ оператора → живая сессия пользователя)
+    "pydantic>=2.8", # DTO HTTP-контракта (граница встраивания)
+    "pyyaml>=6",
 ]
 
 [project.urls]

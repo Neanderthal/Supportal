@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format is based on
 - `examples/demo/` — a local demo page with the embedded widget and a mocked Telegram
   side (mock operator console); documented the widget theming token format.
 - Renamed the project `dali-support` → `supportal`.
+- Feature-flag foundation: `settings.yaml` (hot-reloaded) → env → default, via
+  `supportal/settings.py`. All optional features are off by default and gated by a flag.
+- Rate limiting on `POST /v1/widget/send` (`SUPPORT_RATE_LIMIT`, default off) — a
+  per-`user_ref` sliding window (`supportal/ratelimit.py`).
 
 ## [0.1.0] - 2026-10-16
 

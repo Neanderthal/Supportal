@@ -14,7 +14,7 @@ WORKDIR /app
 # Dependencies (kept in sync with pyproject.toml).
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir \
-        fastapi "uvicorn[standard]" "aiogram>=3.13" "aiohttp-socks>=0.8" httpx "pydantic>=2.8"
+        fastapi "uvicorn[standard]" "aiogram>=3.13" "aiohttp-socks>=0.8" httpx "pydantic>=2.8" "pyyaml>=6"
 
 COPY supportal/ ./supportal/
 
