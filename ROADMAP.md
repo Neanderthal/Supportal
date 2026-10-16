@@ -50,7 +50,7 @@ maturity as an open‑source platform.
 - [x] 🧩 **CSAT / rating** after `/close` (widget buttons → feed row / log) — `SUPPORT_CSAT`, default off.
 - [x] 🔌 **Canned responses** — on the Telegram side (`/c <key>`), no agent console — `SUPPORT_CANNED`, default off.
 - [ ] 🧩 **Proactive message** — `POST /v1/widget/push` so the product can initiate a message to a user.
-- [ ] ⚙️ **Reference Postgres `Store`** implementation + migrations.
+- [x] ⚙️ **Reference Postgres `Store`** (`supportal/store_pg.py`, `SUPPORT_DB_URL=postgresql://…`, `supportal[postgres]`) — same contract as SQLite; idempotent schema; live integration test.
 
 ## v1.0 — platform maturity
 

@@ -32,6 +32,10 @@ dependencies = [
     "pyyaml>=6",
 ]
 
+[project.optional-dependencies]
+# Reference PostgreSQL backend (SUPPORT_DB_URL=postgresql://…). Not needed for the default SQLite store.
+postgres = ["psycopg[binary]>=3.1"]
+
 [project.urls]
 Homepage = "https://github.com/Neanderthal/supportal"
 Repository = "https://github.com/Neanderthal/supportal"
@@ -53,6 +57,9 @@ pythonpath = ["."]   # tests/ import the supportal package from the repo root
 
 [tool.coverage.run]
 source = ["supportal"]   # measure the package, not tests/ or examples/
+# The reference Postgres backend is exercised by an integration test against a live DB (test_postgres_store_unit.py,
+# skipped without SUPPORT_TEST_PG_URL / in CI), not unit tests — so it's excluded from the unit-coverage gate.
+omit = ["supportal/store_pg.py"]
 
 [tool.coverage.report]
 show_missing = true

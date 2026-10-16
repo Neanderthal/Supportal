@@ -168,9 +168,10 @@ Full integration guide: [`docs/integration.md`](docs/integration.md).
 
 ## Storage
 
-SQLite by default (zero infrastructure). For larger‑corpus / fault‑tolerant storage,
-implement the same `store.Store` interface over Postgres and inject it in
-`app.create_app`. Schema and methods: [`supportal/store.py`](supportal/store.py).
+SQLite by default (zero infrastructure). For a multi‑user / fault‑tolerant deployment, set
+`SUPPORT_DB_URL=postgresql://…` — `app.create_app` selects the reference Postgres backend
+([`supportal/store_pg.py`](supportal/store_pg.py), `pip install 'supportal[postgres]'`), which
+implements the same `store.Store` contract. Schema and methods: [`supportal/store.py`](supportal/store.py).
 
 > **Run exactly one process.** The Telegram long‑poller, the outbox‑retry loop and the in‑memory rate
 > limiter are per‑process singletons — do **not** run `uvicorn --workers >1` or multiple replicas (two

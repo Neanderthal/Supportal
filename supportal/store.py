@@ -430,3 +430,10 @@ class Store:
             "attachments": one("SELECT count(*) FROM attachments"),
             "outbox_pending": one("SELECT count(*) FROM outbox WHERE status='pending'"),
         }
+
+
+def make_store(db_url: str):
+    """Open the right backend for a `SUPPORT_DB_URL`: the default SQLite `Store` (`sqlite:///…`) or the
+    reference `PostgresStore` (`postgresql://…`). Both implement the same contract; see docs/integration.md."""
+    from .store_pg import PostgresStore, is_postgres_url
+    return PostgresStore(db_url) if is_postgres_url(db_url) else Store(db_url)

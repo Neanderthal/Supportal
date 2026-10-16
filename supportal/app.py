@@ -22,7 +22,7 @@ from .config import Config
 from .flags import Flags
 from .relay import Relay
 from .settings import get_bool
-from .store import Store
+from .store import make_store
 from .telegram_ops import TelegramOps
 from .widget_api import build_widget_router
 
@@ -40,7 +40,7 @@ _LOG = logging.getLogger("supportal")
 
 def create_app(config: Config | None = None) -> FastAPI:
     cfg = config or Config.from_env()
-    store = Store(cfg.db_url)
+    store = make_store(cfg.db_url)   # SQLite (sqlite:///…) or the reference PostgresStore (postgresql://…)
     store.bootstrap()
     tg = TelegramOps(cfg.tg_bot_token, cfg.tg_group_id, proxy=cfg.tg_proxy)
     relay = Relay(store, tg, cfg.product_callback_url, cfg.callback_secret,
