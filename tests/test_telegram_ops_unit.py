@@ -7,12 +7,51 @@ start_polling registers 2 handlers and calls polling with handle_signals=False/c
 The real end-to-end is a manual smoke test on a test supergroup (plan Ph2).
 """
 import asyncio
+import io
 from types import SimpleNamespace
 
 from supportal.telegram_ops import HELP_TEXT, MEDIA_FETCH_FAILED, TelegramOps, operator_name
 
 _DUMMY_TOKEN = "123456:abc"      # valid by format; the network is not touched until a bot method is called
 _GROUP_ID = -1001234567890
+
+
+class _FakeBot:
+    """A stand-in for the aiogram Bot: async methods that record calls instead of touching the network."""
+    def __init__(self) -> None:
+        self.calls: list = []
+        self.session = SimpleNamespace(close=self._close_session)
+
+    async def create_forum_topic(self, chat_id, name):
+        self.calls.append(("create_forum_topic", chat_id, name)); return SimpleNamespace(message_thread_id=4242)
+
+    async def send_message(self, chat_id, message_thread_id, text):
+        self.calls.append(("send_message", chat_id, message_thread_id, text))
+
+    async def delete_forum_topic(self, chat_id, message_thread_id):
+        self.calls.append(("delete_forum_topic", chat_id, message_thread_id))
+
+    async def send_photo(self, chat_id, message_thread_id, photo, caption):
+        self.calls.append(("send_photo", caption))
+
+    async def send_document(self, chat_id, message_thread_id, document, caption):
+        self.calls.append(("send_document", caption))
+
+    async def get_file(self, file_id):
+        self.calls.append(("get_file", file_id)); return SimpleNamespace(file_path="p/" + file_id)
+
+    async def download_file(self, file_path):
+        self.calls.append(("download_file", file_path)); return io.BytesIO(b"filebytes")
+
+    async def _close_session(self):
+        self.calls.append(("session.close",))
+
+
+def _tg_with_fake_bot():
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
+    bot = _FakeBot()
+    tg._bot = bot
+    return tg, bot
 
 
 def test_operator_name_prefers_username_then_fullname_then_id():
@@ -174,3 +213,61 @@ def test_handle_media_download_failure_posts_operator_note():
     asyncio.run(media_handler(msg))                           # must not raise
     assert media_calls == []                                  # media dropped, not relayed
     assert notes == [(55, MEDIA_FETCH_FAILED)]                # operator told in the topic
+
+
+# ── bot wrappers + media success path (arch review: the media path was the other blind spot) ────────────
+def test_topic_wrappers_call_the_bot():
+    tg, bot = _tg_with_fake_bot()
+    assert asyncio.run(tg.ensure_topic("Some long title")) == 4242
+    asyncio.run(tg.send_to_topic(7, "hello"))
+    asyncio.run(tg.delete_topic(7))
+    asyncio.run(tg.close())
+    assert [c[0] for c in bot.calls] == ["create_forum_topic", "send_message", "delete_forum_topic", "session.close"]
+
+
+def test_download_reads_file_bytes():
+    tg, bot = _tg_with_fake_bot()
+    assert asyncio.run(tg._download("F1")) == b"filebytes"
+    assert ("get_file", "F1") in bot.calls and ("download_file", "p/F1") in bot.calls
+
+
+def test_send_media_photo_vs_document_branching():
+    tg, bot = _tg_with_fake_bot()
+    asyncio.run(tg.send_media(7, b"x", "a.png", "image/png"))         # inline photo
+    asyncio.run(tg.send_media(7, b"x", "a.gif", "image/gif"))         # gif → document (not inline)
+    asyncio.run(tg.send_media(7, b"x", "a.svg", "image/svg+xml"))     # svg → document (no inline render)
+    asyncio.run(tg.send_media(7, b"x", "a.pdf", "application/pdf"))   # non-image → document
+    assert [c[0] for c in bot.calls] == ["send_photo", "send_document", "send_document", "send_document"]
+
+
+def test_handle_media_photo_and_document_success():
+    tg, _bot = _tg_with_fake_bot()
+    got = []
+
+    async def on_media(*a):
+        got.append(a)
+
+    async def _noop(*a):
+        return None
+
+    tg._register_handlers(_noop, _noop, _noop, _noop, on_media)
+    media_handler = tg._dp.message.handlers[1].callback
+    user = SimpleNamespace(username="support1", full_name="", id=1)
+
+    # photo branch → largest size, fixed photo.jpg / image/jpeg
+    photo_msg = SimpleNamespace(message_thread_id=9, message_id=1, caption="look",
+                               photo=[SimpleNamespace(file_id="small"), SimpleNamespace(file_id="big")],
+                               document=None, from_user=user)
+    asyncio.run(media_handler(photo_msg))
+    # document branch → name/mime taken from the document
+    doc = SimpleNamespace(file_id="D1", file_name="report.pdf", mime_type="application/pdf")
+    doc_msg = SimpleNamespace(message_thread_id=9, message_id=2, caption="", photo=None, document=doc, from_user=user)
+    asyncio.run(media_handler(doc_msg))
+    # neither photo nor document → ignored (no on_media)
+    none_msg = SimpleNamespace(message_thread_id=9, message_id=3, caption="", photo=None, document=None, from_user=user)
+    asyncio.run(media_handler(none_msg))
+
+    assert len(got) == 2
+    # (thread_id, data, filename, mime, caption, operator, tg_message_id)
+    assert got[0] == (9, b"filebytes", "photo.jpg", "image/jpeg", "look", "support1", 1)
+    assert got[1] == (9, b"filebytes", "report.pdf", "application/pdf", "", "support1", 2)
