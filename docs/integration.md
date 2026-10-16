@@ -111,6 +111,12 @@ flows. The demo page has **Export my data** / **Delete my conversation** buttons
 > Retention: the relay does not auto-expire data — schedule periodic `POST /v1/admin/delete` from the product
 > for your retention policy (e.g. erase tickets inactive for N days).
 
+## Metrics (feature `SUPPORT_METRICS`, default off)
+`SUPPORT_METRICS=on` exposes `GET /metrics` in Prometheus text format — gauges for tickets (by status),
+messages (by direction), stored attachments, pending outbox, plus `supportal_build_info`. The endpoint is
+**unauthenticated**, so expose it only to your internal Prometheus scrape target (don't proxy it publicly).
+Point a scrape job at `http://<relay-host>:<port>/metrics`.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

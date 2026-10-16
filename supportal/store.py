@@ -408,3 +408,16 @@ class Store:
         rows = self._conn.execute(
             "SELECT thread_id FROM tickets WHERE user_ref=? AND thread_id IS NOT NULL", (user_ref,)).fetchall()
         return [r["thread_id"] for r in rows]
+
+    # ── metrics (feature SUPPORT_METRICS) ───────────────────────────────────────
+    def metrics(self) -> dict:
+        """Point-in-time counts for the /metrics endpoint (cheap COUNT(*) queries; single-process store)."""
+        one = lambda sql, *a: self._conn.execute(sql, a).fetchone()[0]  # noqa: E731
+        return {
+            "tickets_open": one("SELECT count(*) FROM tickets WHERE status='open'"),
+            "tickets_closed": one("SELECT count(*) FROM tickets WHERE status='closed'"),
+            "messages_in": one("SELECT count(*) FROM messages WHERE direction='in' AND deleted=0"),
+            "messages_out": one("SELECT count(*) FROM messages WHERE direction='out' AND deleted=0"),
+            "attachments": one("SELECT count(*) FROM attachments"),
+            "outbox_pending": one("SELECT count(*) FROM outbox WHERE status='pending'"),
+        }

@@ -54,7 +54,7 @@ maturity as an open‑source platform.
 
 ## v1.0 — platform maturity
 
-- [ ] ⚙️ **Observability**: `/metrics` (Prometheus), structured logs (health endpoint already present).
+- [x] ⚙️ **Observability**: `/metrics` (Prometheus, `SUPPORT_METRICS`, default off), health endpoint, structured logs.
 - [x] ⚙️ **GDPR operations**: export / delete a user's conversation by `user_ref` (`SUPPORT_GDPR`, default off; `POST /v1/admin/export|delete`). Retention: schedule deletes from the product.
 - [ ] ⚙️ **Widget tests** (currently manual smoke) + E2E against a test supergroup in CI.
 - [x] 🧩 **Business hours / auto‑away** message — `SUPPORT_BUSINESS_HOURS`, default off (`SUPPORT_HOURS` schedule + tz).

@@ -48,12 +48,14 @@ os.environ.setdefault("SUPPORT_CANNED_REPLIES",
                       "saludo=¡Hola! ¿En qué puedo ayudarte?;horario=Atendemos de lunes a viernes, 9:00–18:00.")
 os.environ.setdefault("SUPPORT_RECEIPTS", "on")   # read receipts: ✓ delivered + the operator console shows "seen"
 os.environ.setdefault("SUPPORT_GDPR", "on")       # GDPR export/erase buttons on the user page
+os.environ.setdefault("SUPPORT_METRICS", "on")    # GET /metrics (Prometheus) reflects the demo's data
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from supportal.api import build_router  # noqa: E402
 from supportal.relay import Relay  # noqa: E402
 from supportal.store import Store  # noqa: E402
 from supportal.tokens import mint_widget_token  # noqa: E402
@@ -124,6 +126,8 @@ app = FastAPI(title="supportal-demo")
 # The browser talks to the widget API under /support-api (in production a reverse proxy
 # strips that prefix to the relay's /v1/widget/*; here we mount it at that path directly).
 app.include_router(build_widget_router(relay, DEMO_SECRET), prefix="/support-api")
+# Also mount the relay's own router so the demo exposes GET /health and GET /metrics (feature SUPPORT_METRICS).
+app.include_router(build_router(relay, "demo-ingress-secret"))
 
 
 @app.post("/support/config")

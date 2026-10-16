@@ -115,6 +115,17 @@ Internal path: the relay itself pulls updates via **long-polling** (getUpdates) 
 {"status": "ok", "service": "supportal"}
 ```
 
+## Metrics: `GET /metrics` (feature `SUPPORT_METRICS`, default off)
+Prometheus text exposition (gauges). Unauthenticated → scrape only from an internal network. `404` when off.
+```
+supportal_tickets{status="open"} 3
+supportal_messages{direction="in"} 12
+supportal_messages{direction="out"} 8
+supportal_attachments 2
+supportal_outbox_pending 0
+supportal_build_info{version="0.1.0"} 1
+```
+
 ## Interactive docs (feature `SUPPORT_OPENAPI`, default off)
 With `SUPPORT_OPENAPI=on`, FastAPI serves the Swagger UI at `GET /docs`, ReDoc at `GET /redoc` and the schema
 at `GET /openapi.json` (routes are grouped by the `widget` / `product` / `health` tags). Off by default — the

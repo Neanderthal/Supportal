@@ -53,6 +53,9 @@ All notable changes to this project are documented here. The format is based on
 - GDPR export / erase (`SUPPORT_GDPR`, default off): `POST /v1/admin/export|delete {user_ref}` (HMAC, contour B)
   export a user's tickets/messages/attachments (base64) or hard-delete them + their Telegram topics
   (`store.export_user`/`delete_user`/`thread_ids_for_user`). The demo page has Export/Delete buttons.
+- Observability (`SUPPORT_METRICS`, default off): `GET /metrics` in Prometheus text format — gauges for tickets
+  (by status), messages (by direction), attachments, pending outbox, and `supportal_build_info`
+  (`store.metrics` + a dependency-free `supportal/metrics.py` renderer). Unauthenticated — internal scrape only.
 
 ### Changed
 - Smaller architecture-review cleanups (#8): added `supportal/flags.py` — feature-flag/setting **names** as
