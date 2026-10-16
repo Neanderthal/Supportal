@@ -28,9 +28,9 @@ The product knows the user's language, so it localizes by returning an optional 
        "strings":{"title":"Soporte","greeting":"Describe tu problema…","placeholder":"Mensaje…","send":"Enviar"}}
 ```
 Keys: `title`, `support` (launcher aria-label), `close`, `greeting`, `placeholder`, `send`, `attach`,
-`sendFail`, `uploadFail`, `uploading` (`{name}` is substituted). The only **server**-generated user-facing
-line is the ticket-closed notice — localize it with the `SUPPORT_CLOSED_NOTICE` setting (operator replies
-come from Telegram in the operator's own language).
+`sendFail`, `uploadFail`, `uploading` (`{name}` is substituted), `csatPrompt`, `csatThanks`. The only
+**server**-generated user-facing line is the ticket-closed notice — localize it with the
+`SUPPORT_CLOSED_NOTICE` setting (operator replies come from Telegram in the operator's own language).
 
 ## Visitor context (feature `SUPPORT_VISITOR_CONTEXT`, default off)
 When on, the widget sends page context with the user's message and the relay posts a **one-time**
@@ -45,6 +45,15 @@ global before the bundle loads:
 
 `/support/config` should report `"context": true` so the widget collects context only when the relay has
 the feature on. The values are display-only — the relay caps field count/length and strips newlines.
+
+## CSAT rating (feature `SUPPORT_CSAT`, default off)
+When on, closing a ticket (`/close`) tags the close notice as a `csat_request`; the widget draws a 1..5 star
+prompt under it. The user's pick is `POST`ed to `/v1/widget/csat`, recorded as a `kind:"csat"` feed row (so it
+survives a reload), and posted into the ticket's Telegram topic (`📊 CSAT: …`) so the operator sees the score.
+
+`/support/config` should report `"csat": true` so the widget renders the prompt only when the relay has the
+feature on (mirrors `context`/`attachments`). Localize the prompt/thanks copy with the `csatPrompt`/`csatThanks`
+`strings` keys. Each closed conversation can be rated once; a newer close re-arms the prompt.
 
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.

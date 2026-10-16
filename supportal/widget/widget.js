@@ -8,7 +8,8 @@
 //   GET  {CONFIG_URL}            → {api_base, token, ttl}  (the product knows the logged-in user, mints the token)
 //                                   no token / not ok → the widget silently does not start (self-gating)
 //   POST {api_base}/v1/widget/send      Bearer token  {text}          → {ok, message_id}
-//   GET  {api_base}/v1/widget/messages?since=<seq>  Bearer token      → {messages:[{id,direction,author,text,ts,deleted}], cursor}
+//   GET  {api_base}/v1/widget/messages?since=<seq>  Bearer token      → {messages:[{id,direction,author,text,ts,deleted,kind}], cursor}
+//   POST {api_base}/v1/widget/csat      Bearer token  {score}         → {ok, message_id}   (feature SUPPORT_CSAT)
 //
 // Operator replies are delivered via polling (visible tab ~4s, hidden less often). `direction`: in = user,
 // out = operator/system. Reconcile by id: new → add; seen → update text; deleted → remove the bubble.
@@ -35,7 +36,9 @@
     attach: "Attach a file",
     sendFail: "⚠️ Couldn't send the message. Please try again.",
     uploadFail: "⚠️ Couldn't upload the file.",
-    uploading: "📤 Uploading {name}…"
+    uploading: "📤 Uploading {name}…",
+    csatPrompt: "How would you rate this conversation?",
+    csatThanks: "Thanks for your feedback!"
   };
 
   var cfg = null;          // {api_base, token, ttl, strings?}
@@ -46,6 +49,11 @@
   var seen = {};           // id → true (dedup between the optimistic echo and polling)
   var bubbles = {};        // id → DOM bubble (for edit-sync: update text; /del: remove)
   var els = {};            // DOM references
+  // CSAT (feature SUPPORT_CSAT): after a close notice (kind=csat_request) the widget shows a rating prompt,
+  // unless this conversation already has a rating (kind=csat). A newer close resets the state (feed is seq-ordered).
+  var csatReqId = 0;       // id of the latest close-notice row awaiting a rating
+  var csatRated = false;   // a rating already exists for the latest close
+  var csatShownId = 0;     // the csatReqId we've already drawn a prompt for
 
   // ── network ────────────────────────────────────────────────────────────────
   function apiUrl(path) { return ((cfg && cfg.api_base) || "") + path; }
@@ -133,6 +141,8 @@
         seen[m.id] = true;
         continue;
       }
+      if (m.kind === "csat_request") { csatReqId = m.id; csatRated = false; csatShownId = 0; }
+      else if (m.kind === "csat") { csatRated = true; }
       if (seen[m.id]) {                      // already on screen → text edit (edited_message)
         if (updateBubble(m.id, m.text || "")) changed = true;
         continue;
@@ -143,7 +153,78 @@
       if (m.direction === "out" && !firstSync && !isOpen) unread++;
     }
     firstSync = false;
+    maybeShowCsat();
     if (changed) { updateBadge(); syncGreeting(); if (isOpen) scrollToBottom(); }
+  }
+
+  // ── CSAT rating (feature SUPPORT_CSAT) ─────────────────────────────────────────
+  // Draw a 1..5 star prompt under the latest close notice; hide/skip once rated. cfg.csat gates the UI.
+  function maybeShowCsat() {
+    if (!(cfg && cfg.csat) || !csatReqId || csatRated) { removeCsatUI(); return; }
+    if (csatShownId === csatReqId) return;         // already drawn for this close
+    removeCsatUI();
+    renderCsat(csatReqId);
+    csatShownId = csatReqId;
+  }
+
+  function renderCsat(reqId) {
+    var anchor = bubbles[reqId] && bubbles[reqId].parentNode;   // the .supportal-msg row of the close notice
+    var box = document.createElement("div");
+    box.className = "supportal-csat";
+    var label = document.createElement("div");
+    label.className = "supportal-csat-label";
+    label.textContent = STRINGS.csatPrompt;
+    box.appendChild(label);
+    var stars = document.createElement("div");
+    stars.className = "supportal-csat-stars";
+    for (var s = 1; s <= 5; s++) {
+      (function (score) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "supportal-csat-star";
+        b.textContent = "☆";
+        b.setAttribute("aria-label", String(score));
+        b.addEventListener("mouseover", function () { paintStars(stars, score); });
+        b.addEventListener("focus", function () { paintStars(stars, score); });
+        b.addEventListener("click", function () { submitCsat(score, box); });
+        stars.appendChild(b);
+      })(s);
+    }
+    stars.addEventListener("mouseout", function () { paintStars(stars, 0); });
+    box.appendChild(stars);
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(box, anchor.nextSibling);
+    else els.list.appendChild(box);
+    els.csat = box;
+    if (isOpen) scrollToBottom();
+  }
+
+  function paintStars(stars, upto) {
+    var btns = stars.querySelectorAll(".supportal-csat-star");
+    for (var i = 0; i < btns.length; i++) btns[i].textContent = i < upto ? "★" : "☆";
+  }
+
+  function submitCsat(score, box) {
+    box.classList.add("supportal-csat-busy");
+    fetch(apiUrl("/v1/widget/csat"), {
+      method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ score: score })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (res) {
+        if (res && res.message_id) {
+          csatRated = true;
+          box.textContent = STRINGS.csatThanks;
+          box.className = "supportal-csat supportal-csat-done";
+          els.csat = null;                         // keep the "thanks" note; the next poll won't clear it
+          pollOnce();                              // pull the recorded rating row into the feed
+        } else {
+          box.classList.remove("supportal-csat-busy");   // let the user try again
+        }
+      }).catch(function () { box.classList.remove("supportal-csat-busy"); });
+  }
+
+  function removeCsatUI() {
+    if (els.csat && els.csat.parentNode) els.csat.parentNode.removeChild(els.csat);
+    els.csat = null;
   }
 
   function renderBubble(m) {

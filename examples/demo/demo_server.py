@@ -30,6 +30,7 @@ if str(_REPO_ROOT) not in sys.path:
 # The demo turns on the optional features it showcases (read live via settings).
 os.environ.setdefault("SUPPORT_ATTACHMENTS", "on")
 os.environ.setdefault("SUPPORT_VISITOR_CONTEXT", "on")
+os.environ.setdefault("SUPPORT_CSAT", "on")
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
@@ -50,6 +51,8 @@ DEMO_STRINGS = {
     "placeholder": "Mensaje…",
     "send": "Enviar",
     "attach": "Adjuntar un archivo",
+    "csatPrompt": "¿Cómo valorarías esta conversación?",
+    "csatThanks": "¡Gracias por tu opinión!",
 }
 HERE = Path(__file__).resolve().parent
 WIDGET_DIR = _REPO_ROOT / "supportal" / "widget"
@@ -107,7 +110,7 @@ app.include_router(build_widget_router(relay, DEMO_SECRET), prefix="/support-api
 async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
-            "ttl": 900, "attachments": True, "context": True, "strings": DEMO_STRINGS}
+            "ttl": 900, "attachments": True, "context": True, "csat": True, "strings": DEMO_STRINGS}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────

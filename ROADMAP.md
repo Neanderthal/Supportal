@@ -32,20 +32,21 @@ maturity as an open‑source platform.
 
 ## v0.2 — internationalization & a richer channel
 
-- [ ] 🧩 **Attachments / images** both directions (Telegram supports them natively; the widget
-      needs upload + render; the `messages` feed grows a content type). Retires the largest v1 non‑goal.
-- [ ] 🧩 **Widget i18n** — extract hard‑coded strings (`widget.js`, `HELP_TEXT`) into locales,
-      default to English. Essential for international adoption.
-- [ ] 🧩 **Visitor context into the topic header** — pass page URL / custom fields from the widget
-      (cheap, useful for operators, no boundary cost).
-- [ ] 🧩 **Rate limiting / basic anti‑spam** on `POST /v1/widget/send` (per `user_ref` / per IP).
+- [x] 🧩 **Attachments / images** both directions (`SUPPORT_ATTACHMENTS`, default off): widget upload +
+      inline/render, operator photos/documents relayed, bytes in the DB. Retires the largest v1 non‑goal.
+- [x] 🧩 **Widget i18n** — UI copy extracted into overridable strings (English default), localized by the
+      product via a `strings` object in `/support/config`.
+- [x] 🧩 **Visitor context into the topic header** (`SUPPORT_VISITOR_CONTEXT`, default off) — page URL /
+      title / custom fields posted once into the topic for the operator.
+- [x] 🧩 **Rate limiting / basic anti‑spam** on `POST /v1/widget/send` (`SUPPORT_RATE_LIMIT`, default off),
+      per `user_ref` sliding window.
 - [ ] ⚙️ **OpenAPI / `/docs`** (free with FastAPI) and a reference product adapter in `examples/`.
 
 ## v0.3 — responsiveness & operator convenience
 
 - [ ] 🧩 **SSE transport** alongside polling (lower latency; graduates a v1 non‑goal). Contract preserved.
 - [ ] 🧩 **Delivery / read status + typing indicator** (lightweight, over the feed / SSE).
-- [ ] 🧩 **CSAT / rating** after `/close` (widget buttons → feed row / log).
+- [x] 🧩 **CSAT / rating** after `/close` (widget buttons → feed row / log) — `SUPPORT_CSAT`, default off.
 - [ ] 🔌 **Canned responses** — on the Telegram side (bot commands / inline), no agent console.
 - [ ] 🧩 **Proactive message** — `POST /v1/widget/push` so the product can initiate a message to a user.
 - [ ] ⚙️ **Reference Postgres `Store`** implementation + migrations.

@@ -116,6 +116,7 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` â
 | `SUPPORT_ATTACHMENTS` | off | file attachments both ways (images inline, other files as links); bytes stored in the DB |
 | `SUPPORT_ATTACHMENTS_MAX_MB` | 10 | max upload size, MB |
 | `SUPPORT_VISITOR_CONTEXT` | off | post a one-time visitor-context block (page URL/title + custom fields) into a new topic |
+| `SUPPORT_CSAT` | off | after `/close`, show a 1..5 star rating in the widget â†’ feed row + posted into the topic (needs `csat:true` in `/support/config`) |
 
 ## HTTP API
 
