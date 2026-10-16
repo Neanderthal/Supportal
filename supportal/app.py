@@ -1,4 +1,4 @@
-"""Точка входа ASGI: собрать конфиг/стор/Telegram/relay, поднять FastAPI + фоновый long-polling."""
+"""ASGI entry point: assemble config/store/Telegram/relay, start FastAPI + a background long-polling loop."""
 from __future__ import annotations
 
 import asyncio
@@ -30,24 +30,24 @@ def create_app(config: Config | None = None) -> FastAPI:
                   outbox_backoff_base=cfg.outbox_backoff_base, outbox_backoff_cap=cfg.outbox_backoff_cap)
 
     def _crash_logger(label: str):
-        # Фоновая задача не должна умирать молча (конвенция logging.md): штатная отмена при
-        # shutdown — тихо, неожиданный сбой — ERROR с трейсбеком.
+        # A background task must not die silently (logging.md convention): a normal cancellation at
+        # shutdown — quietly; an unexpected failure — ERROR with a traceback.
         def _cb(task: asyncio.Task) -> None:
             if task.cancelled():
                 return
             exc = task.exception()
             if exc is not None:
-                _LOG.error("[app] фоновая задача %s упала: %s", label, exc, exc_info=exc)
+                _LOG.error("[app] background task %s crashed: %s", label, exc, exc_info=exc)
         return _cb
 
     async def _outbox_loop() -> None:
-        """Периодически дорассылать неотданные ответы оператора (outbox повтор). Период — из настроек."""
+        """Periodically re-deliver undelivered operator replies (outbox retry). Period — from settings."""
         while True:
             await asyncio.sleep(cfg.outbox_retry_interval)
             try:
                 await relay.retry_outbox_once()
             except Exception:
-                _LOG.exception("[outbox] проход повторной доставки дал сбой")
+                _LOG.exception("[outbox] retry delivery pass failed")
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -57,7 +57,7 @@ def create_app(config: Config | None = None) -> FastAPI:
         poll.add_done_callback(_crash_logger("long-polling"))
         outbox = asyncio.create_task(_outbox_loop())
         outbox.add_done_callback(_crash_logger("outbox-retry"))
-        _LOG.info("[app] supportal поднят: long-polling супергруппы + повтор outbox (период %dс)",
+        _LOG.info("[app] supportal is up: supergroup long-polling + outbox retry (period %ds)",
                   cfg.outbox_retry_interval)
         try:
             yield
@@ -71,9 +71,9 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     app = FastAPI(title="supportal", version="0.1.0", lifespan=lifespan)
     app.include_router(build_router(relay, cfg.ingress_secret))
-    # Публичный widget-API (token-gated) — поверхность браузерного виджета. В проде доступен через
-    # reverse-proxy продукта (same-origin `/support-api/v1/widget/*`) → без CORS. CORS включаем ТОЛЬКО
-    # если задан origin продукта (локальный кросс-оригин dev: чат → relay :8500).
+    # Public widget API (token-gated) — the browser widget's surface. In production it's reached via the
+    # product's reverse-proxy (same-origin `/support-api/v1/widget/*`) → no CORS. We enable CORS ONLY
+    # when a product origin is set (local cross-origin dev: chat → relay :8500).
     app.include_router(build_widget_router(relay, cfg.widget_secret))
     if cfg.allowed_origin:
         from fastapi.middleware.cors import CORSMiddleware
@@ -82,6 +82,6 @@ def create_app(config: Config | None = None) -> FastAPI:
     return app
 
 
-# uvicorn supportal.app:app — создаём только когда задан токен бота (иначе импорт пакета оффлайн-юнитами
-# не должен требовать Telegram-конфиг). Боевой запуск — всегда с заполненным .env.
+# uvicorn supportal.app:app — created only when a bot token is set (otherwise importing the package from
+# offline unit tests must not require Telegram config). A production run always has a filled-in .env.
 app = create_app() if os.environ.get("SUPPORT_TG_BOT_TOKEN") else None

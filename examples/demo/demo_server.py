@@ -134,7 +134,7 @@ async def op_reply(body: ReplyIn) -> dict:
     if not store.get_by_thread(body.thread_id):
         raise HTTPException(status_code=404, detail="unknown thread")
     mid = tg.next_message_id()
-    await relay.on_operator_message(body.thread_id, body.text, "Оператор (демо)", tg_message_id=mid)
+    await relay.on_operator_message(body.thread_id, body.text, "Operator (demo)", tg_message_id=mid)
     return {"ok": True, "tg_message_id": mid}
 
 
@@ -152,7 +152,7 @@ async def op_delete(body: DeleteIn) -> dict:
 
 @app.post("/op/api/close")
 async def op_close(body: CloseIn) -> dict:
-    await relay.on_operator_command(body.thread_id, "/close", "Оператор (демо)")
+    await relay.on_operator_command(body.thread_id, "/close", "Operator (demo)")
     return {"ok": True}
 
 

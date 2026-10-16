@@ -1,93 +1,93 @@
-# HTTP-контракт Supportal
+# Supportal HTTP contract
 
-Два контура: **(A) браузерный виджет напрямую** (ревизия 2026-10-16, основной) и **(B) через продукт**
-(прежняя server-push-модель, остаётся за конфигом). Тела A подписаны Bearer-токеном; тела B — HMAC-SHA256
-заголовком `X-Supportal-Signature` (`hmac.compare_digest`).
+Two contours: **(A) the browser widget directly** (revision 2026-10-16, primary) and **(B) via the product**
+(the earlier server-push model, kept behind config). Contour-A bodies are authorized with a Bearer token; contour-B
+bodies with an HMAC-SHA256 `X-Supportal-Signature` header (`hmac.compare_digest`).
 
-## 0. Браузерный виджет → relay (контур A — основной)
+## 0. Browser widget → relay (contour A — primary)
 
-Публичны через reverse-proxy продукта (same-origin `/support-api/v1/widget/*` → strip-prefix → relay). Авторизация —
-`Authorization: Bearer <token>`, где токен чеканит продукт (`{user_ref, exp}`, подпись `SUPPORT_WIDGET_SECRET`;
-схема — `supportal/tokens.py`). `user_ref` — из токена (сервер), не из тела → анти-спуфинг.
+Exposed through the product's reverse-proxy (same-origin `/support-api/v1/widget/*` → strip-prefix → relay). Authorization —
+`Authorization: Bearer <token>`, where the token is minted by the product (`{user_ref, exp}`, signed with `SUPPORT_WIDGET_SECRET`;
+the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server-side), not from the body → anti-spoofing.
 
-**Отправка:** `POST /v1/widget/send`
+**Send:** `POST /v1/widget/send`
 ```json
-{"text": "Не приходит письмо для сброса пароля"}        →  {"ok": true, "message_id": 12}
+{"text": "The password reset email doesn't arrive"}        →  {"ok": true, "message_id": 12}
 ```
-**Опрос (polling):** `GET /v1/widget/messages?since=<seq>`
+**Poll:** `GET /v1/widget/messages?since=<seq>`
 ```json
-→ {"messages": [{"id": 12, "direction": "in|out", "author": "Оператор", "text": "…", "ts": 1.72e9, "deleted": false}], "cursor": 17}
+→ {"messages": [{"id": 12, "direction": "in|out", "author": "Operator", "text": "…", "ts": 1.72e9, "deleted": false}], "cursor": 17}
 ```
-- Изменения ленты с `seq > since` по возрастанию `seq` (**новые + отредактированные + удалённые**).
-  `cursor` — max seq ответа → клиент шлёт его в `?since=` следующего запроса. `since=0` → вся лента (восстановление).
-- Виджет сверяет по `id`: новое → добавить; уже на экране → обновить текст (edit-sync); `deleted:true` → убрать пузырь.
-- `author` у `out`-сообщений — **всегда «Оператор»** (реальное имя/username оператора пользователю не раскрывается).
-- `401` — нет/просрочен/подделан токен. Пользователь видит только свою ленту (токен привязан к `user_ref`).
+- Feed changes with `seq > since`, ascending by `seq` (**new + edited + deleted**).
+  `cursor` — the max seq of the response → the client sends it in `?since=` on the next request. `since=0` → the whole feed (restore).
+- The widget reconciles by `id`: new → add; already on screen → update text (edit-sync); `deleted:true` → remove the bubble.
+- `author` for `out` messages is **always "Operator"** (the operator's real name/username is not revealed to the user).
+- `401` — missing/expired/forged token. The user sees only their own feed (the token is bound to `user_ref`).
 
-**Команды/правки оператора — через Telegram, НЕ через HTTP** (Bot API не шлёт ботам событий удаления):
-- оператор **редактирует** своё сообщение в топике → relay ловит `edited_message` → текст обновляется в ленте
-  (рост `seq`) → виджет правит пузырь;
-- **`/del`** ответом на своё сообщение → relay помечает строку `deleted` → виджет убирает пузырь;
-- **`/clear`** → вся лента пользователя помечается `deleted` + топик удаляется (`deleteForumTopic`) + тикет
-  сбрасывается → виджет очищается, следующее сообщение создаёт свежий топик;
-- **`/help`** → бот печатает подсказку по командам в топик (в ленту пользователю не уходит);
-- **`/close`** → закрыть обращение.
+**Operator commands/edits — via Telegram, NOT via HTTP** (the Bot API does not send bots deletion events):
+- the operator **edits** their message in the topic → the relay catches `edited_message` → the text is updated in the feed
+  (`seq` grows) → the widget updates the bubble;
+- **`/del`** as a reply to their own message → the relay marks the row `deleted` → the widget removes the bubble;
+- **`/clear`** → the user's entire feed is marked `deleted` + the topic is deleted (`deleteForumTopic`) + the ticket is
+  reset → the widget clears, and the next message creates a fresh topic;
+- **`/help`** → the bot prints a command hint into the topic (it does not go to the user's feed);
+- **`/close`** → close the ticket.
 
-## 1. Продукт → relay: `POST /v1/messages` (контур B)
-Секрет — `SUPPORT_INGRESS_SECRET`.
+## 1. Product → relay: `POST /v1/messages` (contour B)
+Secret — `SUPPORT_INGRESS_SECRET`.
 ```json
 {
   "user_ref": "user@example.com",
-  "text": "Не приходит письмо для сброса пароля",
-  "display_name": "Иванов",
-  "meta": {"product": "web", "page": "Настройки"}
+  "text": "The password reset email doesn't arrive",
+  "display_name": "Ivanov",
+  "meta": {"product": "web", "page": "Settings"}
 }
 ```
-- `user_ref` — стабильный непрозрачный id пользователя (например, нормализованный логин `strip+lower`). Ключ тикета.
-- `meta` — показывается оператору в шапке топика, relay его не интерпретирует.
+- `user_ref` — a stable opaque user id (e.g. a normalized login `strip+lower`). The ticket key.
+- `meta` — shown to the operator in the topic header; the relay does not interpret it.
 
-Ответ `200`:
+Response `200`:
 ```json
 {"ok": true, "ticket_id": "e3f1…", "thread_id": 45, "message_id": 12}
 ```
-`401` — неверная/отсутствующая подпись.
+`401` — invalid/missing signature.
 
-## 2. Relay → продукт: callback на `SUPPORT_PRODUCT_CALLBACK_URL` (контур B — опционально)
-Секрет — `SUPPORT_CALLBACK_SECRET`. Шлётся при ответе оператора и при закрытии тикета, **только если задан**
-`SUPPORT_PRODUCT_CALLBACK_URL`. В контуре A (виджет) не задан → callback/outbox дормант (ответы забирает
-polling виджета из §0; лента `messages` — источник правды).
+## 2. Relay → product: callback to `SUPPORT_PRODUCT_CALLBACK_URL` (contour B — optional)
+Secret — `SUPPORT_CALLBACK_SECRET`. Sent on an operator reply and on ticket closure, **only if**
+`SUPPORT_PRODUCT_CALLBACK_URL` is set. In contour A (widget) it is not set → callback/outbox dormant (replies are picked up
+by widget polling from §0; the `messages` feed is the source of truth).
 ```json
 {
   "event": "message",
   "user_ref": "user@example.com",
   "ticket_id": "e3f1…",
-  "text": "Здравствуйте. Проверьте папку «Спам» — письмо могло попасть туда…",
+  "text": "Hello. Please check the \"Spam\" folder — the email may have landed there…",
   "operator": "support1"
 }
 ```
-- `event ∈ {message, ticket_closed}`. У `ticket_closed` поле `text` пустое (relay подставит дефолт).
-- Адаптер продукта обязан: проверить подпись → по `user_ref` найти живые сессии → доставить сообщение.
+- `event ∈ {message, ticket_closed}`. For `ticket_closed` the `text` field is empty (the relay fills in a default).
+- The product adapter must: verify the signature → find live sessions by `user_ref` → deliver the message.
 
-**Ответ продукта (важно для повторной доставки):**
+**Product response (important for re-delivery):**
 ```json
 {"ok": true, "delivered": 2}
 ```
-- `delivered` — число живых сессий, в которые сообщение реально доставлено.
-- `delivered = 0` → адресат оффлайн: relay кладёт ответ в **outbox** и повторяет этот callback с backoff
-  (`SUPPORT_OUTBOX_*`), пока продукт не вернёт `delivered > 0` или не истечёт TTL (тогда — «сдаёмся», WARNING).
-  Пользователь вернётся → адаптер зарегистрирует сессию → очередной повтор долетит.
-- Поля `delivered` **нет** в ответе → relay считает доставленным (совместимость с простым продуктом без
-  учёта доставки — без вечных повторов).
-- Семантика «не менее одного раза»: при сбое после фактической доставки возможен повтор (для поддержки терпимо).
+- `delivered` — the number of live sessions the message was actually delivered to.
+- `delivered = 0` → the recipient is offline: the relay puts the reply into the **outbox** and retries this callback with backoff
+  (`SUPPORT_OUTBOX_*`) until the product returns `delivered > 0` or the TTL expires (then — "give up", WARNING).
+  When the user comes back → the adapter registers the session → the next retry gets through.
+- The `delivered` field is **absent** from the response → the relay treats it as delivered (compatibility with a simple product that
+  does not track delivery — no endless retries).
+- "At-least-once" semantics: on a failure after an actual delivery a retry is possible (tolerable for support).
 
-**Граница A:** relay повторяет HTTP-callback, опираясь только на число `delivered`; про сессии и
-server-push продукта он не знает — это целиком забота тонкого адаптера продукта.
+**Boundary A:** the relay retries the HTTP callback relying only on the `delivered` count; it knows nothing about the product's
+sessions and server-push — that is entirely the concern of the thin product adapter.
 
 ## 3. Telegram → relay
-Внутренний путь: relay сам забирает обновления через **long-polling** (getUpdates) и маршрутизирует ответы
-операторов по `message_thread_id`. Отдельного HTTP-эндпоинта у продукта для этого не требуется.
+Internal path: the relay itself pulls updates via **long-polling** (getUpdates) and routes operator replies by
+`message_thread_id`. No separate HTTP endpoint on the product is required for this.
 
-## Здоровье: `GET /health`
+## Health: `GET /health`
 ```json
 {"status": "ok", "service": "supportal"}
 ```

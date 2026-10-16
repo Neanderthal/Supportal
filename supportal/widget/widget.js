@@ -1,36 +1,36 @@
-// supportal — встраиваемый виджет поддержки (ванильный JS, без зависимостей).
+// supportal — embeddable support widget (vanilla JS, no dependencies).
 //
-// Самодостаточный: рисует плавающую кнопку «💬» (снизу слева) + выдвижную панель справа, ведёт свою
-// ленту, общается НАПРЯМУЮ с relay по токену. В продукт встраивается одним тегом <script> (+ widget.css);
-// вся логика — здесь. Источник правды переписки — relay (БД), виджет лишь опрашивает.
+// Self-contained: draws a floating "💬" button (bottom-left) + a slide-out panel on the right, keeps its own
+// feed, talks DIRECTLY to the relay with a token. It embeds into a product with a single <script> tag (+ widget.css);
+// all logic is here. The source of truth of the conversation is the relay (DB); the widget only polls.
 //
-// Контракт с хостом (продуктом):
-//   GET  {CONFIG_URL}            → {api_base, token, ttl}  (продукт знает залогиненного, чеканит токен)
-//                                   нет токена / не ок → виджет молча не поднимается (self-gating)
+// Contract with the host (product):
+//   GET  {CONFIG_URL}            → {api_base, token, ttl}  (the product knows the logged-in user, mints the token)
+//                                   no token / not ok → the widget silently does not start (self-gating)
 //   POST {api_base}/v1/widget/send      Bearer token  {text}          → {ok, message_id}
 //   GET  {api_base}/v1/widget/messages?since=<seq>  Bearer token      → {messages:[{id,direction,author,text,ts,deleted}], cursor}
 //
-// Доставка ответов оператора — polling (видимая вкладка ~4с, скрытая реже). `direction`: in = пользователь,
-// out = оператор/система. Сверка по id: новое → добавить; видел → правка текста; deleted → убрать пузырь.
-// Текст оператора приходит из Telegram → вставляем ТОЛЬКО как textContent (без innerHTML).
+// Operator replies are delivered via polling (visible tab ~4s, hidden less often). `direction`: in = user,
+// out = operator/system. Reconcile by id: new → add; seen → update text; deleted → remove the bubble.
+// Operator text comes from Telegram → we insert it ONLY as textContent (no innerHTML).
 (function () {
   "use strict";
-  if (window.__supportalInit) return;      // один инстанс на страницу
+  if (window.__supportalInit) return;      // one instance per page
   window.__supportalInit = true;
 
-  var CONFIG_URL = "/support/config";          // same-origin эндпоинт продукта (отдаёт токен)
+  var CONFIG_URL = "/support/config";          // same-origin product endpoint (returns the token)
   var POLL_VISIBLE = 4000, POLL_HIDDEN = 20000;
 
   var cfg = null;          // {api_base, token, ttl}
-  var lastSeq = 0;         // курсор polling по seq (insert/edit/delete)
-  var unread = 0;          // непрочитанные ответы оператора при закрытой панели
-  var firstSync = true;    // первый опрос = восстановление (не бейджим историю)
+  var lastSeq = 0;         // polling cursor by seq (insert/edit/delete)
+  var unread = 0;          // unread operator replies while the panel is closed
+  var firstSync = true;    // the first poll = restore (don't badge history)
   var isOpen = false;
-  var seen = {};           // id → true (дедуп между оптимистичным эхо и polling)
-  var bubbles = {};        // id → DOM-пузырь (для edit-sync: обновить текст; /del: убрать)
-  var els = {};            // ссылки на DOM
+  var seen = {};           // id → true (dedup between the optimistic echo and polling)
+  var bubbles = {};        // id → DOM bubble (for edit-sync: update text; /del: remove)
+  var els = {};            // DOM references
 
-  // ── сеть ───────────────────────────────────────────────────────────────────
+  // ── network ────────────────────────────────────────────────────────────────
   function apiUrl(path) { return ((cfg && cfg.api_base) || "") + path; }
   function authHeaders(extra) {
     var h = extra || {};
@@ -38,7 +38,7 @@
     return h;
   }
   function fetchConfig() {
-    // POST (не GET): у SPA-продуктов catch-all на GET часто перехватывает любой GET и отдаёт index.html.
+    // POST (not GET): in SPA products a catch-all on GET often intercepts any GET and returns index.html.
     return fetch(CONFIG_URL, { method: "POST", credentials: "same-origin", cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) { return (j && j.token) ? j : null; })
@@ -70,7 +70,7 @@
         if (j.messages) ingest(j.messages);
         if (typeof j.cursor === "number" && j.cursor > lastSeq) lastSeq = j.cursor;
       })
-      .catch(function () { /* сеть мигнула — следующий тик повторит */ });
+      .catch(function () { /* network blipped — the next tick retries */ });
   }
 
   function pollLoop() {
@@ -80,18 +80,18 @@
     });
   }
 
-  // ── лента ────────────────────────────────────────────────────────────────────
-  // Сверка по id: новое → добавить; уже видели → обновить текст (edit-sync); deleted → убрать пузырь.
+  // ── feed ─────────────────────────────────────────────────────────────────────
+  // Reconcile by id: new → add; already seen → update text (edit-sync); deleted → remove the bubble.
   function ingest(messages) {
     var changed = false;
     for (var i = 0; i < messages.length; i++) {
       var m = messages[i];
-      if (m.deleted) {                       // отозвано оператором (/del) → убрать, пометить как видели
+      if (m.deleted) {                       // recalled by the operator (/del) → remove, mark as seen
         if (removeBubble(m.id)) changed = true;
         seen[m.id] = true;
         continue;
       }
-      if (seen[m.id]) {                      // уже на экране → правка текста (edited_message)
+      if (seen[m.id]) {                      // already on screen → text edit (edited_message)
         if (updateBubble(m.id, m.text || "")) changed = true;
         continue;
       }
@@ -111,28 +111,28 @@
     if (m.direction === "out" && m.author) {
       var who = document.createElement("div");
       who.className = "supportal-msg-author";
-      who.textContent = m.author;            // имя оператора — textContent (без HTML)
+      who.textContent = m.author;            // operator name — textContent (no HTML)
       row.appendChild(who);
     }
     var bub = document.createElement("div");
     bub.className = "supportal-bubble";
-    bub.textContent = m.text || "";          // ВАЖНО: текст из Telegram → только textContent
+    bub.textContent = m.text || "";          // IMPORTANT: text from Telegram → textContent only
     row.appendChild(bub);
     els.list.appendChild(row);
-    bubbles[m.id] = bub;                     // для последующих edit/del по id
+    bubbles[m.id] = bub;                     // for later edit/del by id
   }
 
   function updateBubble(id, text) {
     var bub = bubbles[id];
     if (!bub) return false;
-    bub.textContent = text;                  // правка — тоже только textContent
+    bub.textContent = text;                  // an edit — also textContent only
     return true;
   }
 
   function removeBubble(id) {
     var bub = bubbles[id];
     if (!bub) return false;
-    var row = bub.parentNode;                // .supportal-msg (внешняя обёртка)
+    var row = bub.parentNode;                // .supportal-msg (the outer wrapper)
     if (row && row.parentNode) row.parentNode.removeChild(row);
     delete bubbles[id];
     return true;
@@ -146,7 +146,7 @@
     if (isOpen) scrollToBottom();
   }
 
-  // Показать приветствие, когда лента пуста (в т.ч. после /clear), скрыть — когда есть сообщения.
+  // Show the greeting when the feed is empty (incl. after /clear), hide it when there are messages.
   function syncGreeting() {
     if (els.greeting) els.greeting.style.display = els.list.querySelector(".supportal-msg") ? "none" : "";
   }
@@ -156,7 +156,7 @@
     else els.badge.style.display = "none";
   }
 
-  // ── открытие/закрытие ──────────────────────────────────────────────────────
+  // ── open/close ───────────────────────────────────────────────────────────────
   function setOpen(v) {
     isOpen = v;
     els.root.classList.toggle("open", v);
@@ -171,14 +171,14 @@
     autoGrow();
     send(text).then(function (res) {
       if (res && res.message_id) {
-        if (!seen[res.message_id]) {   // мог уже прийти polling-ом — тогда не дублируем
+        if (!seen[res.message_id]) {   // it may have already arrived via polling — then don't duplicate
           seen[res.message_id] = true;
           renderBubble({ id: res.message_id, direction: "in", author: "", text: text });
           syncGreeting(); scrollToBottom();
         }
-        // курсор — по seq (его двигает polling); эхо дедупится seen[id], трогать курсор не нужно
+        // the cursor is by seq (polling advances it); the echo is deduped by seen[id], no need to touch the cursor
       } else {
-        renderNote("⚠️ Не удалось отправить сообщение. Попробуйте ещё раз.");
+        renderNote("⚠️ Couldn't send the message. Please try again.");
       }
     });
   }
@@ -189,6 +189,7 @@
   }
 
   // ── DOM ──────────────────────────────────────────────────────────────────────
+  // (UI copy below is the widget's default English locale; a product can restyle via CSS tokens.)
   var CHAT_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"'
     + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2'
     + ' 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
@@ -197,15 +198,15 @@
     var root = document.createElement("div");
     root.id = "supportal-root";
     root.innerHTML =
-      '<button id="supportal-fab" type="button" aria-label="Поддержка" aria-expanded="false">'
+      '<button id="supportal-fab" type="button" aria-label="Support" aria-expanded="false">'
       + CHAT_ICON + '<span class="supportal-fab-badge" style="display:none"></span></button>'
-      + '<section class="supportal-drawer" role="dialog" aria-label="Чат поддержки">'
-      + '  <header class="supportal-drawer-head"><span class="supportal-drawer-title">Поддержка</span>'
-      + '    <button class="supportal-drawer-close" type="button" aria-label="Закрыть">&times;</button></header>'
-      + '  <div class="supportal-msg-list"><div class="supportal-greeting">Опишите вопрос — ответит оператор поддержки.'
-      + ' Ответ придёт сюда, можно не ждать на странице.</div></div>'
-      + '  <form class="supportal-composer"><textarea rows="1" placeholder="Сообщение…" class="supportal-input"></textarea>'
-      + '    <button type="submit" class="supportal-send" aria-label="Отправить">'
+      + '<section class="supportal-drawer" role="dialog" aria-label="Support chat">'
+      + '  <header class="supportal-drawer-head"><span class="supportal-drawer-title">Support</span>'
+      + '    <button class="supportal-drawer-close" type="button" aria-label="Close">&times;</button></header>'
+      + '  <div class="supportal-msg-list"><div class="supportal-greeting">Describe your question — a support operator will reply.'
+      + ' The reply will arrive here; you don\'t have to wait on the page.</div></div>'
+      + '  <form class="supportal-composer"><textarea rows="1" placeholder="Message…" class="supportal-input"></textarea>'
+      + '    <button type="submit" class="supportal-send" aria-label="Send">'
       + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"'
       + ' stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/>'
       + '<polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button></form>'
@@ -229,10 +230,10 @@
     });
   }
 
-  // ── запуск: добываем конфиг (с токеном), затем поднимаем UI и polling ────────
+  // ── start: fetch config (with token), then bring up the UI and polling ───────
   function start() {
     fetchConfig().then(function (j) {
-      if (!j) { setTimeout(start, 30000); return; }  // не залогинен/выключено → тихо повторим позже
+      if (!j) { setTimeout(start, 30000); return; }  // not logged in / disabled → quietly retry later
       cfg = j;
       build();
       pollLoop();

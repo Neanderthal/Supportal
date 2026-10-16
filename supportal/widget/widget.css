@@ -1,6 +1,6 @@
-/* supportal — стили встраиваемого виджета поддержки. Всё под #supportal-root (не влияет на хост).
-   Используем дизайн-токены хоста (--primary/--card/… как в shadcn) с ФОЛБЭКАМИ → тема/тёмный режим
-   подхватываются у продукта автоматически, а без токенов виджет остаётся вменяемым (переиспользуемость). */
+/* supportal — styles for the embeddable support widget. Everything under #supportal-root (does not affect the host).
+   We use the host's design tokens (--primary/--card/… like shadcn) with FALLBACKS → theme/dark mode
+   are picked up from the product automatically, and without tokens the widget stays sensible (reusability). */
 
 #supportal-root {
   font-family: inherit;
@@ -14,7 +14,7 @@
   --ds-radius: var(--radius, 0.55rem);
 }
 
-/* ── плавающая кнопка (снизу слева) ─────────────────────────────────────────── */
+/* ── floating button (bottom-left) ──────────────────────────────────────────── */
 #supportal-fab {
   position: fixed; left: 20px; bottom: 20px;
   width: 56px; height: 56px; border-radius: 9999px; border: none;
@@ -32,7 +32,7 @@
   box-shadow: 0 0 0 2px hsl(var(--ds-card));
 }
 
-/* ── выдвижная панель (справа) ──────────────────────────────────────────────── */
+/* ── slide-out panel (right) ────────────────────────────────────────────────── */
 .supportal-drawer {
   position: fixed; top: 0; right: 0; height: 100dvh; width: 380px; max-width: 92vw;
   background: hsl(var(--ds-card)); color: hsl(var(--ds-fg));
@@ -88,7 +88,7 @@
 }
 .supportal-send:hover { filter: brightness(1.06); }
 
-/* Телефон: панель во весь экран; кнопку поднимаем над композером чата (он во всю ширину снизу). */
+/* Phone: full-screen panel; lift the button above the chat composer (which is full-width at the bottom). */
 @media (max-width: 640px) {
   .supportal-drawer { width: 100vw; max-width: none; }
   #supportal-fab { bottom: 84px; }

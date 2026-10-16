@@ -1,29 +1,29 @@
-"""Ф2 — Telegram-сторона оффлайн: operator_name + регистрация/маршрутизация хэндлеров топиков.
+"""Ph2 — Telegram side offline: operator_name + topic handler registration/routing.
 
-aiogram — main-dep (установлен), но сеть не нужна: Bot("123456:abc") конструируется локально
-(validate_token проверяет лишь ФОРМАТ токена), start_polling замокан. Проверяем: operator_name;
-start_polling регистрирует 2 хэндлера и зовёт polling с handle_signals=False/close_bot_session=False;
-/close→on_command и обычный текст→on_message маршрутизируются с верными (thread_id, …, operator).
-Реальный end-to-end — ручной smoke на тестовой супергруппе (Ф2 плана).
+aiogram is a main dep (installed), but the network is not needed: Bot("123456:abc") is constructed locally
+(validate_token checks only the FORMAT of the token), start_polling is mocked. We check: operator_name;
+start_polling registers 2 handlers and calls polling with handle_signals=False/close_bot_session=False;
+/close→on_command and plain text→on_message are routed with the correct (thread_id, …, operator).
+The real end-to-end is a manual smoke test on a test supergroup (plan Ph2).
 """
 import asyncio
 from types import SimpleNamespace
 
 from supportal.telegram_ops import HELP_TEXT, TelegramOps, operator_name
 
-_DUMMY_TOKEN = "123456:abc"      # валиден по формату; сеть не трогается до вызова метода бота
+_DUMMY_TOKEN = "123456:abc"      # valid by format; the network is not touched until a bot method is called
 _GROUP_ID = -1001234567890
 
 
 def test_operator_name_prefers_username_then_fullname_then_id():
-    assert operator_name(SimpleNamespace(username="support1", full_name="Пётр", id=7)) == "support1"
-    assert operator_name(SimpleNamespace(username=None, full_name="Пётр Петров", id=7)) == "Пётр Петров"
+    assert operator_name(SimpleNamespace(username="support1", full_name="Pyotr", id=7)) == "support1"
+    assert operator_name(SimpleNamespace(username=None, full_name="Pyotr Petrov", id=7)) == "Pyotr Petrov"
     assert operator_name(SimpleNamespace(username=None, full_name="", id=7)) == "7"
     assert operator_name(None) == ""
 
 
 def test_proxy_builds_session_with_connector():
-    # proxy задан → Bot строится с AiohttpSession поверх forward-proxy (egress к Telegram через внешний хост)
+    # proxy set → Bot is built with AiohttpSession over a forward-proxy (egress to Telegram via an external host)
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID, proxy="http://user:secret@proxy.example.com:1080")
     from aiogram.client.session.aiohttp import AiohttpSession
     assert isinstance(tg._bot.session, AiohttpSession)
@@ -51,15 +51,15 @@ def test_start_polling_registers_handlers(monkeypatch):
         return None
 
     asyncio.run(tg.start_polling(_noop, _noop, _noop, _noop))
-    # 2 message-хэндлера (команда+текст) + 1 edited_message-хэндлер (edit-sync)
+    # 2 message handlers (command+text) + 1 edited_message handler (edit-sync)
     assert captured == {"msg_handlers": 2, "edit_handlers": 1,
                         "handle_signals": False, "close_bot_session": False}
 
 
 def _handlers(tg, on_message, on_command, on_edit, on_delete):
     tg._register_handlers(on_message, on_command, on_edit, on_delete)
-    return (tg._dp.message.handlers[0].callback,      # [0] команда
-            tg._dp.message.handlers[1].callback,      # [1] текст
+    return (tg._dp.message.handlers[0].callback,      # [0] command
+            tg._dp.message.handlers[1].callback,      # [1] text
             tg._dp.edited_message.handlers[0].callback)  # edited_message
 
 
@@ -80,38 +80,38 @@ def test_handlers_route_command_text_edit_delete():
         seen["del"].append(tg_message_id)
 
     cmd_handler, text_handler, edit_handler = _handlers(tg, on_message, on_command, on_edit, on_delete)
-    user = SimpleNamespace(username="support1", full_name="Пётр", id=7)
+    user = SimpleNamespace(username="support1", full_name="Pyotr", id=7)
 
     # /close → on_command
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/close"),
                             command=SimpleNamespace(command="close")))
-    # текст → on_message (с message_id)
+    # text → on_message (with message_id)
     asyncio.run(text_handler(SimpleNamespace(message_thread_id=55, from_user=user,
-                                             text="проверьте настройки уведомлений", message_id=99)))
-    # /del ОТВЕТОМ на сообщение msg_id=42 → on_delete(42); reply не на служебное (forum_topic_created=None)
+                                             text="check your notification settings", message_id=99)))
+    # /del AS A REPLY to message msg_id=42 → on_delete(42); reply not to a service one (forum_topic_created=None)
     reply = SimpleNamespace(message_id=42, forum_topic_created=None)
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/del",
                                             reply_to_message=reply),
                             command=SimpleNamespace(command="del")))
-    # /del без ответа → игнор (ничего не удаляем вслепую)
+    # /del with no reply → ignored (never delete blindly)
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/del",
                                             reply_to_message=None),
                             command=SimpleNamespace(command="del")))
-    # редактирование сообщения msg_id=42 → on_edit
+    # editing message msg_id=42 → on_edit
     asyncio.run(edit_handler(SimpleNamespace(message_thread_id=55, from_user=user,
-                                             text="проверьте настройки уведомлений и спам", message_id=42)))
+                                             text="check your notification settings and spam", message_id=42)))
 
     assert seen["cmd"] == [(55, "/close", "support1")]
-    assert seen["msg"] == [(55, "проверьте настройки уведомлений", "support1", 99)]
-    assert seen["del"] == [42]                               # только валидный reply-таргет
-    assert seen["edit"] == [(42, "проверьте настройки уведомлений и спам")]
+    assert seen["msg"] == [(55, "check your notification settings", "support1", 99)]
+    assert seen["del"] == [42]                               # only a valid reply target
+    assert seen["edit"] == [(42, "check your notification settings and spam")]
 
 
 def test_clear_routes_to_command_and_help_posts_to_topic():
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
     sent = []
 
-    async def _fake_send(thread_id, text):          # /help печатает в топик через self.send_to_topic
+    async def _fake_send(thread_id, text):          # /help prints to the topic via self.send_to_topic
         sent.append((thread_id, text))
 
     tg.send_to_topic = _fake_send
@@ -124,11 +124,11 @@ def test_clear_routes_to_command_and_help_posts_to_topic():
         return None
 
     cmd_handler, _text, _edit = _handlers(tg, _noop, on_command, _noop, _noop)
-    user = SimpleNamespace(username="support1", full_name="Пётр", id=7)
-    # /clear → маршрутизируется в on_command (как /close), relay сам чистит обе стороны
+    user = SimpleNamespace(username="support1", full_name="Pyotr", id=7)
+    # /clear → routed to on_command (like /close), the relay clears both sides itself
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/clear"),
                             command=SimpleNamespace(command="clear")))
-    # /help → подсказка печатается в топик, on_command НЕ зовётся (operator-facing)
+    # /help → the hint is printed to the topic, on_command is NOT called (operator-facing)
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/help"),
                             command=SimpleNamespace(command="help")))
     assert cmds == [(55, "/clear", "support1")]

@@ -1,9 +1,9 @@
-# Supportal — документы
+# Supportal — documentation
 
-- [architecture.md](architecture.md) — архитектурные заметки: зачем нужен сервис, границы и разделение
-  кода, два контура, модель данных.
-- [api.md](api.md) — HTTP-контракт (контур A/B, формат, подписи).
-- [integration.md](integration.md) — как встроить в веб-продукт (адаптер продукта) + настройка
-  Telegram-стороны (forum-супергруппа, бот-админ, `group_id`) + развёртывание.
+- [architecture.md](architecture.md) — architecture notes: why the service exists, boundaries and the code
+  split, the two contours, the data model.
+- [api.md](api.md) — the HTTP contract (contour A/B, format, signatures).
+- [integration.md](integration.md) — how to embed into a web product (the product adapter) + Telegram-side
+  setup (forum supergroup, admin bot, `group_id`) + deployment.
 
-Обзор продукта и быстрый старт — в корневом [README.md](../README.md).
+A product overview and quick start are in the root [README.md](../README.md).

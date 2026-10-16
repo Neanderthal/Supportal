@@ -1,40 +1,40 @@
-# Встраивание в продукт + настройка Telegram
+# Embedding into a product + Telegram setup
 
-## Обязанности адаптера продукта
-Relay не зависит от продукта. Встраивающая сторона пишет тонкий адаптер, который:
-1. **Исходящее:** сообщение пользователя из чата → `POST {RELAY}/v1/messages` с `{user_ref, display_name,
-   text, meta}` + заголовок `X-Supportal-Signature` (HMAC на `SUPPORT_INGRESS_SECRET`).
-2. **Входящее:** принять callback от relay, проверить HMAC (`SUPPORT_CALLBACK_SECRET`), по `user_ref`
-   доставить `text` в **живую** сессию пользователя; сессии нет → сохранить и отдать при следующем входе.
-3. **Личность:** `user_ref` — стабильный ключ (нормализованный логин). Один ключ на пользователя во всех
-   вкладках/сессиях, иначе ответы разъедутся.
+## Product adapter responsibilities
+The relay does not depend on the product. The embedding side writes a thin adapter that:
+1. **Outbound:** a user's chat message → `POST {RELAY}/v1/messages` with `{user_ref, display_name,
+   text, meta}` + the `X-Supportal-Signature` header (HMAC over `SUPPORT_INGRESS_SECRET`).
+2. **Inbound:** accept the callback from the relay, verify the HMAC (`SUPPORT_CALLBACK_SECRET`), and by `user_ref`
+   deliver `text` into the user's **live** session; no session → store it and hand it over on the next login.
+3. **Identity:** `user_ref` is a stable key (a normalized login). One key per user across all
+   tabs/sessions, otherwise replies will diverge.
 
-Типовой адаптер (server-push в живую сессию, реестр `user_ref → session_id`, фолбэк по истёкшей сессии)
-пишется на стороне конкретного продукта. Общая картина разделения — [architecture.md](architecture.md).
+A typical adapter (server-push into the live session, a `user_ref → session_id` registry, a fallback for an expired session)
+is written on the specific product's side. The overall split — [architecture.md](architecture.md).
 
-## Тема виджета
-Виджет берёт палитру из дизайн-токенов хоста в формате **shadcn — HSL-каналы** `"H S% L%"`
-(например `--primary: 221 83% 53%`), потому что внутри оборачивает их в `hsl(var(--primary))`.
-⚠️ **Не hex и не `hsl(...)`** — `hsl(#2563eb)` невалиден, и пузыри «поедут» (станут невидимыми).
-Токенов нет — виджет берёт встроенные фолбэки и остаётся читаемым. Пример — `examples/demo/index.html`.
+## Widget theme
+The widget takes its palette from the host's design tokens in the **shadcn format — HSL channels** `"H S% L%"`
+(e.g. `--primary: 221 83% 53%`), because internally it wraps them in `hsl(var(--primary))`.
+⚠️ **Not hex and not `hsl(...)`** — `hsl(#2563eb)` is invalid and the bubbles will "break" (become invisible).
+No tokens — the widget uses its built-in fallbacks and stays readable. Example — `examples/demo/index.html`.
 
-## Настройка Telegram-стороны (один раз)
-1. Создать бота у @BotFather → `SUPPORT_TG_BOT_TOKEN`.
-2. Создать **супергруппу** поддержки, включить в ней **Topics** (темы форума).
-3. Добавить бота в группу администратором с правом **«Управление темами»** (can_manage_topics).
-4. Узнать `chat_id` группы (обычно отрицательный, вида `-100…`) → `SUPPORT_TG_GROUP_ID`.
-5. Операторы работают прямо в группе: каждый пользователь — свой топик; ответ пишется в топик; `/close`
-   закрывает тикет.
+## Telegram-side setup (one-time)
+1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
+2. Create a support **supergroup** and enable **Topics** (forum topics) in it.
+3. Add the bot to the group as an admin with the **"Manage topics"** right (can_manage_topics).
+4. Find the group's `chat_id` (usually negative, like `-100…`) → `SUPPORT_TG_GROUP_ID`.
+5. Operators work right in the group: each user gets their own topic; a reply is written into the topic; `/close`
+   closes the ticket.
 
-## Хранилище
-Дефолт — SQLite (`sqlite:///…`, самодостаточно). Для многопользовательского/отказоустойчивого контура
-реализовать класс с интерфейсом `store.Store` поверх Postgres (та же таблица `tickets`) и подставить его
-в `app.create_app`. Схема в `supportal/store.py`.
+## Storage
+Default — SQLite (`sqlite:///…`, self-contained). For a multi-user / fault-tolerant setup
+implement a class with the `store.Store` interface over Postgres (the same `tickets` table) and swap it
+into `app.create_app`. The schema is in `supportal/store.py`.
 
-## Развёртывание рядом с продуктом
-- Co-location: сервис в compose продукта, той же docker-сети. Ingress и callback ходят по внутренним
-  именам (`http://supportal:8500`, `http://<продукт>/…/push`). Публичных маршрутов добавлять не нужно.
-- Telegram — egress long-polling. ⚠️ В некоторых сетях/облаках `api.telegram.org` достижим **только по
-  IPv6**, а docker-сеть обычно без IPv6. Два пути: (а) включить IPv6-egress контейнеру; (б) **`SUPPORT_TG_PROXY`** —
-  HTTP CONNECT forward-proxy на внешнем хосте с IPv4-egress к Telegram. Прокси стоит залочить по IP релея +
-  auth + только CONNECT:443 к `api.telegram.org`.
+## Deploying next to the product
+- Co-location: the service in the product's compose, on the same docker network. Ingress and callback travel over internal
+  names (`http://supportal:8500`, `http://<product>/…/push`). No public routes need to be added.
+- Telegram — egress long-polling. ⚠️ In some networks/clouds `api.telegram.org` is reachable **only over
+  IPv6**, while a docker network usually has no IPv6. Two paths: (a) enable IPv6 egress for the container; (b) **`SUPPORT_TG_PROXY`** —
+  an HTTP CONNECT forward-proxy on an external host with IPv4 egress to Telegram. The proxy should be locked down by the relay's IP +
+  auth + only CONNECT:443 to `api.telegram.org`.

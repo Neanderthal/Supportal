@@ -1,9 +1,9 @@
-"""Ф3b — outbox повторной доставки ответа оператора. Граница A: relay повторяет HTTP-callback, НЕ зная
-про сессии продукта — решение «доставлено?» целиком по числу delivered из ответа.
+"""Ph3b — outbox for retrying operator-reply delivery. Boundary A: the relay retries the HTTP callback WITHOUT knowing
+about the product's sessions — the "delivered?" decision is entirely by the delivered count from the response.
 
-Оффлайн: стор outbox (enqueue/due/mark_*), Relay._post_callback (семантика delivered), _dispatch
-(enqueue на промахе, не на успехе), retry_outbox_once (delivered→done, промах→backoff, TTL/max→dead).
-Сеть замокана (httpx), aiogram не нужен (TelegramOps — фейк).
+Offline: the outbox store (enqueue/due/mark_*), Relay._post_callback (delivered semantics), _dispatch
+(enqueue on a miss, not on success), retry_outbox_once (delivered→done, miss→backoff, TTL/max→dead).
+The network is mocked (httpx), aiogram not needed (TelegramOps is a fake).
 """
 import asyncio, os, tempfile
 
@@ -13,7 +13,7 @@ from supportal.models import OperatorEvent
 from supportal.relay import Relay
 from supportal.store import Store
 
-_EV = OperatorEvent(event="message", user_ref="eng@x", ticket_id="t1", text="проверьте сапун", operator="op1")
+_EV = OperatorEvent(event="message", user_ref="eng@x", ticket_id="t1", text="check the breather", operator="op1")
 
 
 class _FakeTG:
@@ -34,7 +34,7 @@ class _Resp:
 
     def json(self):
         if self._payload is None:
-            raise ValueError("нет тела")
+            raise ValueError("no body")
         return self._payload
 
 
@@ -56,7 +56,7 @@ class _Client:
     async def post(self, url, content=None, headers=None):
         _Client.calls += 1
         if _Client.raise_exc:
-            raise RuntimeError("relay/продукт недоступен")
+            raise RuntimeError("relay/product unavailable")
         return _Resp(_Client.status, _Client.payload)
 
 
@@ -79,13 +79,13 @@ def _patch(monkeypatch, status=200, payload=None, raise_exc=False):
     monkeypatch.setattr(httpx, "AsyncClient", _Client)
 
 
-# ── стор ──────────────────────────────────────────────────────────────────────
+# ── store ─────────────────────────────────────────────────────────────────────
 def test_outbox_enqueue_due_and_delivered():
     s = _store()
     assert s.outbox_pending_count() == 0
-    rid = s.enqueue_outbox("t1", "eng@x", "message", "привет", "op1", attempts=1, next_attempt_at=100.0)
+    rid = s.enqueue_outbox("t1", "eng@x", "message", "hi", "op1", attempts=1, next_attempt_at=100.0)
     assert rid > 0 and s.outbox_pending_count() == 1
-    assert s.outbox_due(now=50.0) == []                 # ещё не дозрело
+    assert s.outbox_due(now=50.0) == []                 # not due yet
     due = s.outbox_due(now=150.0)
     assert len(due) == 1 and due[0].ticket_id == "t1" and due[0].attempts == 1
     s.outbox_mark_delivered(due[0].id)
@@ -96,35 +96,35 @@ def test_outbox_mark_retry_and_dead():
     s = _store()
     rid = s.enqueue_outbox("t2", "eng@x", "message", "x", "op", attempts=1, next_attempt_at=10.0)
     s.outbox_mark_retry(rid, attempts=2, next_attempt_at=999.0)
-    assert s.outbox_due(now=100.0) == []                # перенесено в будущее
+    assert s.outbox_due(now=100.0) == []                # rescheduled into the future
     assert s.outbox_due(now=1000.0)[0].attempts == 2
     s.outbox_mark_dead(rid)
     assert s.outbox_pending_count() == 0
 
 
-# ── _post_callback: семантика delivered ────────────────────────────────────────
+# ── _post_callback: delivered semantics ─────────────────────────────────────────
 def test_post_callback_delivered_semantics(monkeypatch):
     r = _relay(_store())
     _patch(monkeypatch, payload={"ok": True, "delivered": 2})
     assert asyncio.run(r._post_callback(_EV)) is True
-    _patch(monkeypatch, payload={"ok": True, "delivered": 0})     # адресат оффлайн
+    _patch(monkeypatch, payload={"ok": True, "delivered": 0})     # recipient offline
     assert asyncio.run(r._post_callback(_EV)) is False
-    _patch(monkeypatch, payload={"ok": True})                     # нет delivered → совместимость → доставлено
+    _patch(monkeypatch, payload={"ok": True})                     # no delivered → compatibility → delivered
     assert asyncio.run(r._post_callback(_EV)) is True
-    _patch(monkeypatch, status=500, payload={"delivered": 1})     # 5xx → повторим
+    _patch(monkeypatch, status=500, payload={"delivered": 1})     # 5xx → retry
     assert asyncio.run(r._post_callback(_EV)) is False
-    _patch(monkeypatch, raise_exc=True)                           # сеть упала → повторим
+    _patch(monkeypatch, raise_exc=True)                           # network down → retry
     assert asyncio.run(r._post_callback(_EV)) is False
 
 
-# ── _dispatch: enqueue только на промахе ────────────────────────────────────────
+# ── _dispatch: enqueue only on a miss ───────────────────────────────────────────
 def test_dispatch_enqueues_on_miss(monkeypatch):
     s = _store()
     _patch(monkeypatch, payload={"delivered": 0})
     asyncio.run(_relay(s)._dispatch(_EV))
     assert s.outbox_pending_count() == 1
     due = s.outbox_due(now=10 ** 12)
-    assert due[0].text == "проверьте сапун" and due[0].attempts == 1
+    assert due[0].text == "check the breather" and due[0].attempts == 1
 
 
 def test_dispatch_no_enqueue_on_hit(monkeypatch):
@@ -137,36 +137,36 @@ def test_dispatch_no_enqueue_on_hit(monkeypatch):
 # ── retry_outbox_once ───────────────────────────────────────────────────────────
 def test_retry_delivers_when_back_online(monkeypatch):
     s = _store()
-    s.enqueue_outbox("t", "eng@x", "message", "ответ", "op", attempts=1, next_attempt_at=0.0)
-    _patch(monkeypatch, payload={"delivered": 1})       # пользователь вернулся → адаптер запушил
+    s.enqueue_outbox("t", "eng@x", "message", "reply", "op", attempts=1, next_attempt_at=0.0)
+    _patch(monkeypatch, payload={"delivered": 1})       # the user came back → the adapter pushed
     n = asyncio.run(_relay(s).retry_outbox_once())
     assert n == 1 and s.outbox_pending_count() == 0
 
 
 def test_retry_reschedules_on_miss(monkeypatch):
     s = _store()
-    s.enqueue_outbox("t", "eng@x", "message", "ответ", "op", attempts=1, next_attempt_at=0.0)
-    _patch(monkeypatch, payload={"delivered": 0})       # всё ещё оффлайн
+    s.enqueue_outbox("t", "eng@x", "message", "reply", "op", attempts=1, next_attempt_at=0.0)
+    _patch(monkeypatch, payload={"delivered": 0})       # still offline
     asyncio.run(_relay(s).retry_outbox_once())
     assert s.outbox_pending_count() == 1
-    assert s.outbox_due(now=0.0) == []                  # отложено по backoff в будущее
-    assert s.outbox_due(now=10 ** 12)[0].attempts == 2  # попытка учтена
+    assert s.outbox_due(now=0.0) == []                  # postponed by backoff into the future
+    assert s.outbox_due(now=10 ** 12)[0].attempts == 2  # the attempt is counted
 
 
 def test_retry_gives_up_after_max_attempts(monkeypatch):
     s = _store()
     r = _relay(s, outbox_max_attempts=3)
-    s.enqueue_outbox("t", "eng@x", "message", "ответ", "op", attempts=3, next_attempt_at=0.0)
+    s.enqueue_outbox("t", "eng@x", "message", "reply", "op", attempts=3, next_attempt_at=0.0)
     _patch(monkeypatch, payload={"delivered": 0})
     asyncio.run(r.retry_outbox_once())
-    assert s.outbox_pending_count() == 0                # помечено dead
-    assert _Client.calls == 0                           # исчерпали попытки → даже не стучались
+    assert s.outbox_pending_count() == 0                # marked dead
+    assert _Client.calls == 0                           # attempts exhausted → didn't even knock
 
 
 def test_retry_gives_up_after_ttl(monkeypatch):
     s = _store()
-    r = _relay(s, outbox_ttl=0.0)                       # мгновенно просрочено
-    s.enqueue_outbox("t", "eng@x", "message", "ответ", "op", attempts=1, next_attempt_at=0.0)
+    r = _relay(s, outbox_ttl=0.0)                       # instantly expired
+    s.enqueue_outbox("t", "eng@x", "message", "reply", "op", attempts=1, next_attempt_at=0.0)
     _patch(monkeypatch, payload={"delivered": 0})
     asyncio.run(r.retry_outbox_once())
-    assert s.outbox_pending_count() == 0                # dead по TTL
+    assert s.outbox_pending_count() == 0                # dead by TTL

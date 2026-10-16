@@ -1,4 +1,4 @@
-"""ratelimit.py — скользящее окно (детерминированно через now) + 429 на /v1/widget/send за флагом."""
+"""ratelimit.py — sliding window (deterministic via now) + 429 on /v1/widget/send behind a flag."""
 import os, tempfile
 
 from fastapi import FastAPI
@@ -15,22 +15,22 @@ from supportal.widget_api import build_widget_router
 _SECRET = "wsecret"
 
 
-# ── unit: окно ──────────────────────────────────────────────────────────────
+# ── unit: window ──────────────────────────────────────────────────────────────
 def test_window_allows_then_blocks():
     lim = SlidingWindowLimiter()
     assert lim.allow("u", 3, 60, now=100.0)
     assert lim.allow("u", 3, 60, now=101.0)
     assert lim.allow("u", 3, 60, now=102.0)
-    assert not lim.allow("u", 3, 60, now=103.0)      # 4-е в окне → блок
-    assert lim.allow("u", 3, 60, now=170.0)          # окно уехало → снова можно
+    assert not lim.allow("u", 3, 60, now=103.0)      # 4th in the window → block
+    assert lim.allow("u", 3, 60, now=170.0)          # window moved on → allowed again
 
 
 def test_window_eviction_and_key_isolation():
     lim = SlidingWindowLimiter()
     assert lim.allow("a", 1, 10, now=0.0)
     assert not lim.allow("a", 1, 10, now=5.0)
-    assert lim.allow("a", 1, 10, now=11.0)           # старый хит вытеснен из окна
-    assert lim.allow("b", 1, 10, now=5.0)             # другой ключ независим
+    assert lim.allow("a", 1, 10, now=11.0)           # old hit evicted from the window
+    assert lim.allow("b", 1, 10, now=5.0)             # a different key is independent
 
 
 def test_nonpositive_max_never_blocks():
@@ -39,7 +39,7 @@ def test_nonpositive_max_never_blocks():
     assert lim.allow("u", -1, 60, now=1.0)
 
 
-# ── интеграция: флаг гейтит 429 на эндпоинте ─────────────────────────────────
+# ── integration: the flag gates 429 on the endpoint ──────────────────────────
 class _FakeTG:
     def __init__(self) -> None:
         self._n = 0
@@ -63,13 +63,13 @@ def _client() -> TestClient:
     return TestClient(app)
 
 
-def _send(client: TestClient, token: str, text: str = "привет"):
+def _send(client: TestClient, token: str, text: str = "hi"):
     return client.post("/v1/widget/send", json={"text": text},
                        headers={"Authorization": "Bearer " + token})
 
 
 def _force_env_only(tmp_path):
-    # нет settings.yaml → значения берутся из env (fail-soft)
+    # no settings.yaml → values come from env (fail-soft)
     S._SETTINGS_FILE = str(tmp_path / "none.yaml")
     S._cache = {}; S._cache_mtime = -1.0; S._last_stat = 0.0; S._loaded_once = False
 
@@ -92,6 +92,6 @@ def test_flag_on_blocks_after_max(tmp_path, monkeypatch):
     client = _client(); token = mint_widget_token("u2", _SECRET)
     assert _send(client, token).status_code == 200
     assert _send(client, token).status_code == 200
-    assert _send(client, token).status_code == 429       # 3-е в окне → блок
+    assert _send(client, token).status_code == 429       # 3rd in the window → block
     other = mint_widget_token("u3", _SECRET)
-    assert _send(client, other).status_code == 200        # другой user не затронут
+    assert _send(client, other).status_code == 200        # a different user is unaffected
