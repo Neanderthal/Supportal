@@ -78,6 +78,9 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- Ingress now returns **422** (not an unhandled 500) on a validly-signed but malformed/incomplete `POST
+  /v1/messages` body (`supportal/api.py`): the raw body bypasses FastAPI's own validation, so a bad product
+  adapter used to trigger a `ValidationError` → 500. Caught → `HTTPException(422)`.
 - Made the `messages.seq` change-cursor **atomic** and hardened the SQLite connection (architecture review
   #1/#2): `seq` is now bumped in one statement via a single-row `seq_counter` (`UPDATE … RETURNING`),
   replacing the `SELECT MAX(seq)+1`-then-insert that could hand two writers the same value (silently
