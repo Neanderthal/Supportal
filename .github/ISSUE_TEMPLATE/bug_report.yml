@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a problem with dali-support
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug! Please do **not** include secrets (bot tokens, HMAC
+        secrets) or confidential user message content.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When I ..., the relay ... but I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Configure ...
+        2. Send ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (metadata only)
+      description: Paste relevant log lines. Redact any message text or secrets.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: v0.1.0 or git SHA
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "Python 3.12, Docker, SQLite/Postgres, OS ..."
+    validations:
+      required: true

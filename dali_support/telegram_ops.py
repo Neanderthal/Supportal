@@ -45,8 +45,8 @@ def operator_name(user) -> str:
 class TelegramOps:
     def __init__(self, bot_token: str, group_id: int, proxy: str = "") -> None:
         from aiogram import Bot, Dispatcher
-        # proxy задан → egress к api.telegram.org через forward-proxy (на Timeweb Telegram доступен лишь по
-        # IPv6; HTTP CONNECT-прокси на внешнем хосте с IPv4-egress снимает блокер, см. docs/integration.md §IPv6).
+        # proxy задан → egress к api.telegram.org через forward-proxy (в некоторых сетях Telegram доступен
+        # лишь по IPv6; HTTP CONNECT-прокси на внешнем хосте с IPv4-egress снимает блокер, см. docs/integration.md §IPv6).
         if proxy:
             from aiogram.client.session.aiohttp import AiohttpSession
             self._bot = Bot(bot_token, session=AiohttpSession(proxy=proxy))
@@ -85,7 +85,7 @@ class TelegramOps:
 
         async def _handle_command(message: Message, command: CommandObject) -> None:
             if command.command == "del":
-                # Отзыв сообщения: оператор отвечает `/del` на СВО�ё сообщение. Цель — reply_to_message
+                # Отзыв сообщения: оператор отвечает `/del` на своё сообщение. Цель — reply_to_message
                 # (но не служебное «топик создан»). Нет цели → игнор (ничего не удаляем вслепую).
                 rt = message.reply_to_message
                 target = rt.message_id if (rt and not rt.forum_topic_created) else 0

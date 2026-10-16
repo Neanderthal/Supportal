@@ -1,16 +1,41 @@
 [project]
 name = "dali-support"
 version = "0.1.0"
-description = "dali-support: встраиваемый relay «веб-чат пользователя ↔ оператор в Telegram» (forum-топики)"
+description = "Embeddable relay: web-chat user ⇄ support operator in Telegram (forum topics)"
+readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Sergey Istomin", email = "sergey.istomin@gmail.com" }]
+keywords = [
+    "telegram", "support", "livechat", "relay", "fastapi", "aiogram",
+    "widget", "customer-support", "helpdesk",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Chat",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
     "aiogram>=3.13",     # Telegram Bot API (forum topics, long-polling) — сторона оператора
-    "aiohttp-socks>=0.8",  # прокси-коннектор для aiogram (egress к Telegram через forward-proxy, напр. Kuma) — нужен, когда задан SUPPORT_TG_PROXY
+    "aiohttp-socks>=0.8",  # прокси-коннектор для aiogram (egress к Telegram через forward-proxy) — нужен, когда задан SUPPORT_TG_PROXY
     "httpx>=0.27",       # callback продукту (ответ оператора → живая сессия пользователя)
     "pydantic>=2.8",     # DTO HTTP-контракта (граница встраивания)
 ]
+
+[project.urls]
+Homepage = "https://github.com/Neanderthal/dali-support"
+Repository = "https://github.com/Neanderthal/dali-support"
+Issues = "https://github.com/Neanderthal/dali-support/issues"
+Changelog = "https://github.com/Neanderthal/dali-support/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
@@ -28,7 +53,7 @@ pythonpath = ["."]   # tests/ импортят пакет dali_support из ко
 line-length = 120
 
 [tool.ruff.lint]
-# Фиксируем дефолтный набор ruff (E4/E7/E9/F) версия-независимо (как в rca-stack/dali-drawing).
+# Фиксируем дефолтный набор ruff (E4/E7/E9/F) версия-независимо.
 select = ["E4", "E7", "E9", "F"]
 # Намеренный компактный стиль: E701 `if x: y`, E702 `a; b`, E401 `import a, b`.
 ignore = ["E701", "E702", "E401"]

@@ -38,7 +38,7 @@
     return h;
   }
   function fetchConfig() {
-    // POST (не GET): у Chainlit SPA-catch-all перехватывает любой GET и отдаёт index.html (как /survey/submit).
+    // POST (не GET): у SPA-продуктов catch-all на GET часто перехватывает любой GET и отдаёт index.html.
     return fetch(CONFIG_URL, { method: "POST", credentials: "same-origin", cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) { return (j && j.token) ? j : null; })

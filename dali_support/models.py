@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class IngressMessage(BaseModel):
     """Продукт → relay: сообщение пользователя в поддержку."""
 
-    user_ref: str = Field(..., description="Стабильный непрозрачный id пользователя (у ДаЛи — нормализованный логин). Ключ тикета.")
+    user_ref: str = Field(..., description="Стабильный непрозрачный id пользователя (например, нормализованный логин). Ключ тикета.")
     text: str = Field(..., description="Текст пользователя.")
     display_name: str = Field("", description="Человекочитаемое имя — в заголовок топика/шапку (не секрет).")
     meta: dict = Field(default_factory=dict, description="Доп. контекст оператору (продукт, страница) — показывается, не парсится.")

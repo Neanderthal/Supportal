@@ -6,13 +6,13 @@
 
 ## 0. Браузерный виджет → relay (контур A — основной)
 
-Публичны через Caddy (same-origin `/support-api/v1/widget/*` → strip-prefix → relay). Авторизация —
+Публичны через reverse-proxy продукта (same-origin `/support-api/v1/widget/*` → strip-prefix → relay). Авторизация —
 `Authorization: Bearer <token>`, где токен чеканит продукт (`{user_ref, exp}`, подпись `SUPPORT_WIDGET_SECRET`;
 схема — `dali_support/tokens.py`). `user_ref` — из токена (сервер), не из тела → анти-спуфинг.
 
 **Отправка:** `POST /v1/widget/send`
 ```json
-{"text": "Нет давления в контуре"}        →  {"ok": true, "message_id": 12}
+{"text": "Не приходит письмо для сброса пароля"}        →  {"ok": true, "message_id": 12}
 ```
 **Опрос (polling):** `GET /v1/widget/messages?since=<seq>`
 ```json
@@ -37,18 +37,18 @@
 Секрет — `SUPPORT_INGRESS_SECRET`.
 ```json
 {
-  "user_ref": "engineer@example.com",
-  "text": "Нет давления в контуре после замены насоса",
-  "display_name": "Иванов · Husky-линия",
-  "meta": {"product": "dali-chat", "page": "Husky MM"}
+  "user_ref": "user@example.com",
+  "text": "Не приходит письмо для сброса пароля",
+  "display_name": "Иванов",
+  "meta": {"product": "web", "page": "Настройки"}
 }
 ```
-- `user_ref` — стабильный непрозрачный id пользователя (у ДаЛи — нормализованный логин `strip+lower`). Ключ тикета.
+- `user_ref` — стабильный непрозрачный id пользователя (например, нормализованный логин `strip+lower`). Ключ тикета.
 - `meta` — показывается оператору в шапке топика, relay его не интерпретирует.
 
 Ответ `200`:
 ```json
-{"ok": true, "ticket_id": "e3f1…", "thread_id": 45}
+{"ok": true, "ticket_id": "e3f1…", "thread_id": 45, "message_id": 12}
 ```
 `401` — неверная/отсутствующая подпись.
 
@@ -59,9 +59,9 @@ polling виджета из §0; лента `messages` — источник пр
 ```json
 {
   "event": "message",
-  "user_ref": "engineer@example.com",
+  "user_ref": "user@example.com",
   "ticket_id": "e3f1…",
-  "text": "Здравствуйте. Проверьте сапун бака и уровень масла…",
+  "text": "Здравствуйте. Проверьте папку «Спам» — письмо могло попасть туда…",
   "operator": "support1"
 }
 ```
@@ -80,7 +80,7 @@ polling виджета из §0; лента `messages` — источник пр
   учёта доставки — без вечных повторов).
 - Семантика «не менее одного раза»: при сбое после фактической доставки возможен повтор (для поддержки терпимо).
 
-**Граница A:** relay повторяет HTTP-callback, опираясь только на число `delivered`; про сессии, Chainlit и
+**Граница A:** relay повторяет HTTP-callback, опираясь только на число `delivered`; про сессии и
 server-push продукта он не знает — это целиком забота тонкого адаптера продукта.
 
 ## 3. Telegram → relay

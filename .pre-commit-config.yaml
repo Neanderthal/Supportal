@@ -1,0 +1,20 @@
+# Run: uv run pre-commit install
+# Note: only ruff lint — NOT ruff-format (the codebase uses an intentional compact
+# style with E701/E702/E401 ignored, which the formatter would expand).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
