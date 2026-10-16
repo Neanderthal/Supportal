@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format is based on
   CI and Docker‑publish workflows, Dependabot, `.dockerignore`, `.editorconfig`,
   pre‑commit config.
 - English `README.md` and package metadata (authors, license, URLs, classifiers).
+- `ROADMAP.md`; replaced the internal mini‑spec with a focused `docs/architecture.md`.
 
 ## [0.1.0] - 2026-10-16
 

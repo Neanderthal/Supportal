@@ -172,6 +172,11 @@ Please report vulnerabilities privately — see [SECURITY.md](SECURITY.md). The 
 handles arbitrary user text and bot credentials: keep secrets in the environment only,
 and log metadata, not message content.
 
+## Roadmap
+
+Planned features and milestones are tracked in [ROADMAP.md](ROADMAP.md). The relay stays
+a thin, product‑agnostic component — the operator experience lives in Telegram by design.
+
 ## Contributing
 
 Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and
