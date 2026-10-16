@@ -93,6 +93,12 @@ class Store:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA busy_timeout=5000")
 
+    def close_connection(self) -> None:
+        """Close the SQLite connection (called from the app lifespan on shutdown; also avoids a dangling
+        connection / ResourceWarning for a Store created ad hoc). NB: distinct from close(ticket_id), which
+        closes a ticket."""
+        self._conn.close()
+
     def bootstrap(self) -> None:
         self._conn.execute(
             """CREATE TABLE IF NOT EXISTS tickets (
