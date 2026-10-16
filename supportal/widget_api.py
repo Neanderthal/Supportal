@@ -115,12 +115,20 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         if _rate_limited(user_ref):
             _LOG.warning("[widget] rate-limited (upload) user=%s", user_ref[:8])
             raise HTTPException(status_code=429, detail="rate limited")
-        data = await request.body()
+        max_bytes = get_int("SUPPORT_ATTACHMENTS_MAX_MB", 10) * 1024 * 1024
+        # Memory-DoS guard: reject BEFORE buffering when the declared size already exceeds the cap, then
+        # stream with a hard cap so a missing/understated Content-Length still can't OOM the process.
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > max_bytes:
+            raise HTTPException(status_code=413, detail="file too large")
+        buf = bytearray()
+        async for chunk in request.stream():
+            buf.extend(chunk)
+            if len(buf) > max_bytes:
+                raise HTTPException(status_code=413, detail="file too large")
+        data = bytes(buf)
         if not data:
             raise HTTPException(status_code=400, detail="empty file")
-        max_bytes = get_int("SUPPORT_ATTACHMENTS_MAX_MB", 10) * 1024 * 1024
-        if len(data) > max_bytes:
-            raise HTTPException(status_code=413, detail="file too large")
         mime = (request.headers.get("content-type") or "application/octet-stream").split(";")[0].strip()
         res = await relay.add_user_attachment(user_ref, user_ref, data, name or "file", mime, "")
         _LOG.info("[widget] upload user=%s mime=%s size=%d mid=%d", user_ref[:8], mime, len(data), res.message_id)

@@ -53,6 +53,10 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Security
+- Enforce the attachment upload size cap **before buffering** (architecture review #4): `POST
+  /v1/widget/upload` used to read the whole body into memory before the `SUPPORT_ATTACHMENTS_MAX_MB` check,
+  so an authenticated user could OOM the process. It now rejects on an oversized `Content-Length` up front
+  and streams the body with a hard cap (a missing/understated length can't get past it).
 - Sanitize the attachment download `Content-Disposition` filename (architecture review #5): the name comes
   from the browser (`?name=`) or Telegram (`document.file_name`), so a `"` or CR/LF could break or inject
   the header. The ASCII `filename="…"` fallback now strips unsafe chars and an RFC 5987 `filename*=UTF-8''…`

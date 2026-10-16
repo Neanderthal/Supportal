@@ -115,6 +115,32 @@ def test_size_cap_rejects(tmp_path, monkeypatch):
     assert _upload(client, token).status_code == 413
 
 
+def test_upload_rejects_oversize_before_buffering(tmp_path, monkeypatch):
+    # arch review #4: a declared Content-Length over the cap is rejected 413 before the body is buffered.
+    _force_env_only(tmp_path); monkeypatch.setenv("SUPPORT_ATTACHMENTS", "on")
+    monkeypatch.setenv("SUPPORT_ATTACHMENTS_MAX_MB", "1")
+    client = _client(); token = mint_widget_token("u1", _SECRET)
+    hdr = {"Authorization": "Bearer " + token, "Content-Type": "application/octet-stream"}
+    over = client.post("/v1/widget/upload?name=big.bin", content=b"x" * (1024 * 1024 + 1), headers=hdr)
+    assert over.status_code == 413
+    within = client.post("/v1/widget/upload?name=ok.bin", content=b"y" * 1024, headers=hdr)
+    assert within.status_code == 200
+
+
+def test_upload_streaming_cap_without_content_length(tmp_path, monkeypatch):
+    # No Content-Length (chunked body) → the streaming hard-cap still trips 413 (can't lie past the guard).
+    _force_env_only(tmp_path); monkeypatch.setenv("SUPPORT_ATTACHMENTS", "on")
+    monkeypatch.setenv("SUPPORT_ATTACHMENTS_MAX_MB", "1")
+    client = _client(); token = mint_widget_token("u1", _SECRET)
+
+    def _chunked():
+        for _ in range(3):
+            yield b"z" * (512 * 1024)                          # 1.5 MiB total, streamed, no Content-Length
+    r = client.post("/v1/widget/upload?name=stream.bin", content=_chunked(),
+                    headers={"Authorization": "Bearer " + token, "Content-Type": "application/octet-stream"})
+    assert r.status_code == 413
+
+
 # ── endpoints (flag off → feature absent) ────────────────────────────────────
 def test_flag_off_upload_and_serve_404(tmp_path, monkeypatch):
     _force_env_only(tmp_path); monkeypatch.delenv("SUPPORT_ATTACHMENTS", raising=False)
