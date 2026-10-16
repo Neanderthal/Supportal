@@ -90,6 +90,10 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- Widget polling no longer strands rows from a large `/clear` batch (`supportal/store.py`): `/clear` stamps
+  the whole feed with one `seq`, and the client cursor is the page's max `seq`, so a feed larger than the
+  200-row page limit left the remaining same-`seq` rows unfetched (stale bubbles surviving a clear).
+  `changes_since` now extends the page to the full final-`seq` group so a page always ends on a `seq` boundary.
 - `POST /v1/widget/read` now honors `SUPPORT_RATE_LIMIT` like the other write routes
   (`supportal/widget_api.py`): a valid token could otherwise spam read-reports, amplifying into DB writes
   and one Telegram reaction per newly-read message. (The off path was already a cheap no-op — `mark_read`

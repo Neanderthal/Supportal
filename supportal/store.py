@@ -357,11 +357,20 @@ class Store:
 
         Includes deleted ones (deleted=1) — the widget removes their bubbles; and edited ones — it updates the text.
         The client cursor = max(seq) of the response."""
-        cur = self._conn.execute(
+        rows = self._conn.execute(
             "SELECT m.*, a.filename AS attachment_name, a.mime AS attachment_mime "
             "FROM messages m LEFT JOIN attachments a ON a.id = m.attachment_id "
-            "WHERE m.user_ref=? AND m.seq>? ORDER BY m.seq LIMIT ?", (user_ref, after_seq, limit))
-        return [self._message_row(r) for r in cur.fetchall()]
+            "WHERE m.user_ref=? AND m.seq>? ORDER BY m.seq, m.id LIMIT ?", (user_ref, after_seq, limit)).fetchall()
+        # Never end a page in the MIDDLE of one seq: a batch op (/clear) stamps many rows with a SINGLE seq, and
+        # the client cursor is max(seq) of the page — so equal-seq rows beyond the limit would be skipped next
+        # poll (seq > cursor). Pull the rest of the final seq group so the page always ends on a seq boundary.
+        if len(rows) == limit:
+            rows.extend(self._conn.execute(
+                "SELECT m.*, a.filename AS attachment_name, a.mime AS attachment_mime "
+                "FROM messages m LEFT JOIN attachments a ON a.id = m.attachment_id "
+                "WHERE m.user_ref=? AND m.seq=? AND m.id>? ORDER BY m.id",
+                (user_ref, rows[-1]["seq"], rows[-1]["id"])).fetchall())
+        return [self._message_row(r) for r in rows]
 
     def mark_read(self, user_ref: str, up_to_seq: int) -> list[int]:
         """Read receipt (feature SUPPORT_RECEIPTS): mark the user's `out` messages with seq ≤ up_to_seq as read.
