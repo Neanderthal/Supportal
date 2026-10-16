@@ -112,6 +112,10 @@ All notable changes to this project are documented here. The format is based on
   with no signal (`supportal/telegram_ops.py`).
 
 ### Security
+- Hardened attachment serving (defense-in-depth, code-review follow-up): `GET /v1/widget/attachment/{id}`
+  now always sends `X-Content-Type-Options: nosniff` and serves only known raster types
+  (png/jpeg/gif/webp) inline — anything else, notably `image/svg+xml`, is forced to download. The endpoint
+  is already Bearer-header-gated (not navigable), so this is layered hardening, not a fixed vulnerability.
 - Enforce the attachment upload size cap **before buffering** (architecture review #4): `POST
   /v1/widget/upload` used to read the whole body into memory before the `SUPPORT_ATTACHMENTS_MAX_MB` check,
   so an authenticated user could OOM the process. It now rejects on an oversized `Content-Length` up front

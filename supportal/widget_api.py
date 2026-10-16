@@ -31,6 +31,10 @@ _LOG = logging.getLogger("supportal.widget")
 # (document.file_name) — untrusted.
 _UNSAFE_FILENAME = re.compile(r'[\r\n"\\\x00-\x1f\x7f]')
 
+# Raster image types safe to serve inline (they can't script). Everything else — notably image/svg+xml — is
+# served as a download, so a crafted attachment can't execute if ever loaded as a document.
+_INLINE_IMAGE_MIMES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
+
 
 def _content_disposition(filename: str) -> str:
     """Build a safe `Content-Disposition: attachment` header value for an untrusted filename.
@@ -173,8 +177,12 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         att = relay.get_attachment(attachment_id)
         if not att or att.user_ref != user_ref:
             raise HTTPException(status_code=404, detail="not found")
-        headers = {}
-        if not (att.mime or "").startswith("image/"):
+        # Defense-in-depth (the endpoint is Bearer-header-gated, so it can't be top-level-navigated or loaded
+        # via <img src>, and the widget renders images from a blob — but still): never sniff, and only serve a
+        # known-inert raster type inline. Anything else — incl. image/svg+xml, which CAN script when rendered
+        # as a document — is sent as a download, mirroring the Telegram-egress exclusion.
+        headers = {"X-Content-Type-Options": "nosniff"}
+        if (att.mime or "") not in _INLINE_IMAGE_MIMES:
             headers["Content-Disposition"] = _content_disposition(att.filename)
         return Response(content=att.data, media_type=att.mime or "application/octet-stream", headers=headers)
 
