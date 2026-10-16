@@ -81,6 +81,10 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- Concurrent first-contact from one user no longer creates duplicate Telegram topics
+  (`supportal/relay.py`): find-or-create of a ticket+topic ran a check-then-act across `await ensure_topic`,
+  so two simultaneous first messages (two tabs / retry / send+upload) both created a topic. Serialized per
+  `user_ref` with an `asyncio.Lock` via a shared `_ensure_ticket` helper (used by ingress and attachments).
 - Ingress now returns **422** (not an unhandled 500) on a validly-signed but malformed/incomplete `POST
   /v1/messages` body (`supportal/api.py`): the raw body bypasses FastAPI's own validation, so a bad product
   adapter used to trigger a `ValidationError` → 500. Caught → `HTTPException(422)`.

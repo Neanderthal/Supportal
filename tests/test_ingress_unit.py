@@ -4,7 +4,7 @@ We check: the HMAC gate on /v1/messages (200/401), find-or-create of the ticket,
 the message header (name + meta context) and reuse of an open ticket. aiogram/network not needed —
 the relay is assembled with a fake TelegramOps (async ensure_topic/send_to_topic).
 """
-import os, tempfile
+import asyncio, os, tempfile
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -108,3 +108,37 @@ def test_health():
     client = _client(_FakeTG())
     r = client.get("/health")
     assert r.status_code == 200 and r.json() == {"status": "ok", "service": "supportal"}
+
+
+def test_concurrent_first_contact_creates_one_topic():
+    # Two concurrent first-contact messages from one user must NOT create two Telegram topics.
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_"), "t.db")
+    store = Store(f"sqlite:///{path}"); store.bootstrap()
+
+    class _SlowTG:
+        def __init__(self) -> None:
+            self.ensure_calls = 0
+
+        async def ensure_topic(self, title: str) -> int:
+            self.ensure_calls += 1
+            await asyncio.sleep(0.02)          # yield so a concurrent first-contact interleaves
+            return 500 + self.ensure_calls
+
+        async def send_to_topic(self, thread_id: int, text: str) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+    tg = _SlowTG()
+    relay = Relay(store, tg, "", "")           # contour A (no callback)
+
+    async def _run():
+        await asyncio.gather(
+            relay.ingress(IngressMessage(user_ref="u1", text="a", display_name="U1")),
+            relay.ingress(IngressMessage(user_ref="u1", text="b", display_name="U1")),
+        )
+
+    asyncio.run(_run())
+    assert tg.ensure_calls == 1                 # per-user lock serialized the first-contact → one topic
+    assert store.get_open_by_user("u1") is not None
