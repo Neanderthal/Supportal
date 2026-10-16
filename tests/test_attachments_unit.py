@@ -8,7 +8,7 @@ from supportal import settings as S
 from supportal.relay import Relay
 from supportal.store import Store
 from supportal.tokens import mint_widget_token
-from supportal.widget_api import build_widget_router
+from supportal.widget_api import _content_disposition, build_widget_router
 
 _SECRET = "wsecret"
 _PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32   # fake image bytes (only the prefix matters here)
@@ -121,3 +121,28 @@ def test_flag_off_upload_and_serve_404(tmp_path, monkeypatch):
     client = _client(); token = mint_widget_token("u1", _SECRET)
     assert _upload(client, token).status_code == 404
     assert client.get("/v1/widget/attachment/1", headers=_auth(token)).status_code == 404
+
+
+# ── Content-Disposition filename sanitization (arch review #5) ─────────────────
+def test_content_disposition_helper_strips_injection():
+    cd = _content_disposition('a"b\r\nSet-Cookie: x.pdf')
+    assert "\r" not in cd and "\n" not in cd                  # no header injection
+    assert cd.count('"') == 2                                 # only the two delimiters; inner quote stripped
+    assert cd.startswith('attachment; filename="')
+    assert "filename*=UTF-8''" in cd                          # RFC 5987 form present
+    assert 'filename="file"' in _content_disposition("")      # empty → "file"
+
+
+def test_download_filename_sanitized_no_header_injection(tmp_path, monkeypatch):
+    _force_env_only(tmp_path); monkeypatch.setenv("SUPPORT_ATTACHMENTS", "on")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_att_"), "t.db")
+    store = Store(f"sqlite:///{path}"); store.bootstrap()
+    # a NON-image (so Content-Disposition is set) with a hostile filename: quote + CRLF injection attempt
+    aid = store.add_attachment("u1", "in", 'in"voice\r\nSet-Cookie: pwn.pdf', "application/pdf", b"%PDF fake")
+    relay = Relay(store, _FakeTG(), "", "")
+    app = FastAPI(); app.include_router(build_widget_router(relay, _SECRET))
+    g = TestClient(app).get("/v1/widget/attachment/" + str(aid), headers=_auth(mint_widget_token("u1", _SECRET)))
+    assert g.status_code == 200
+    cd = g.headers["content-disposition"]
+    assert "\r" not in cd and "\n" not in cd and cd.count('"') == 2
+    assert "filename*=UTF-8''" in cd

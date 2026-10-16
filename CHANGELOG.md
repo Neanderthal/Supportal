@@ -48,6 +48,12 @@ All notable changes to this project are documented here. The format is based on
   labels, greeting, placeholder, error notice) and the operator "ticket closed" notice.
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
+### Security
+- Sanitize the attachment download `Content-Disposition` filename (architecture review #5): the name comes
+  from the browser (`?name=`) or Telegram (`document.file_name`), so a `"` or CR/LF could break or inject
+  the header. The ASCII `filename="…"` fallback now strips unsafe chars and an RFC 5987 `filename*=UTF-8''…`
+  carries the real name safely (`supportal/widget_api.py`).
+
 ## [0.1.0] - 2026-10-16
 
 Initial public release.
