@@ -16,6 +16,11 @@ from .telegram_ops import TelegramOps
 
 _LOG = logging.getLogger("dali.support.relay")
 
+# Имя отвечающего, которое ВИДИТ пользователь в виджете — всегда обезличенное «Оператор» (реальный
+# username/имя оператора НЕ уходит в ленту/браузер; атрибуция конкретного оператора остаётся в самом
+# Telegram-топике — это его сообщение). `operator` всё ещё несётся в OperatorEvent/логи (модель «через продукт»).
+OPERATOR_DISPLAY = "Оператор"
+
 
 def sign(body: bytes, secret: str) -> str:
     """HMAC-SHA256 тела для заголовка X-Dali-Signature (обе стороны контракта сверяют compare_digest)."""
@@ -66,7 +71,7 @@ class Relay:
         if not ticket:
             _LOG.warning("[reply] ответ в неизвестном топике thread=%s — пропускаю", thread_id)
             return
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", operator or "Поддержка", text,
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, text,
                                 tg_message_id=tg_message_id)
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
                                            ticket_id=ticket.ticket_id, text=text, operator=operator))
@@ -92,7 +97,7 @@ class Relay:
         if command == "/close":
             self._store.close(ticket.ticket_id)
             self._store.add_message(ticket.ticket_id, ticket.user_ref, "out",
-                                    operator or "Поддержка", "Обращение закрыто оператором.")
+                                    OPERATOR_DISPLAY, "Обращение закрыто оператором.")
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
         elif command == "/clear":

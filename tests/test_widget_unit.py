@@ -131,9 +131,10 @@ def test_operator_reply_poll_and_callback_dormant():
     relay, store, tg, client = _build(callback_url="")   # callback пуст → _dispatch дормант
     client.post("/v1/widget/send", json={"text": "первое"}, headers=_bearer("eng@x"))
     thread_id = store.get_open_by_user("eng@x").thread_id
-    asyncio.run(relay.on_operator_message(thread_id, "проверяю, минуту", "Оператор", 777))
+    asyncio.run(relay.on_operator_message(thread_id, "проверяю, минуту", "support1", 777))
     poll = client.get("/v1/widget/messages?since=0", headers=_bearer("eng@x")).json()
     assert [m["direction"] for m in poll["messages"]] == ["in", "out"]
+    # реальное имя оператора ("support1") НЕ уходит пользователю — всегда обезличенное «Оператор»
     assert poll["messages"][1]["author"] == "Оператор" and poll["messages"][1]["text"] == "проверяю, минуту"
     after = poll["cursor"]
     assert client.get(f"/v1/widget/messages?since={after}", headers=_bearer("eng@x")).json()["messages"] == []
