@@ -31,6 +31,17 @@ if str(_REPO_ROOT) not in sys.path:
 os.environ.setdefault("SUPPORT_ATTACHMENTS", "on")
 os.environ.setdefault("SUPPORT_VISITOR_CONTEXT", "on")
 os.environ.setdefault("SUPPORT_CSAT", "on")
+# Business hours: rig a schedule that is ALWAYS "after hours" right now (a 1h window two hours ahead, in UTC),
+# so the out-of-hours auto-reply is reliably demonstrated whenever the demo is opened.
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+_utcnow = datetime.now(timezone.utc)
+_wd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][_utcnow.weekday()]
+os.environ.setdefault("SUPPORT_BUSINESS_HOURS", "on")
+os.environ.setdefault("SUPPORT_HOURS_TZ", "UTC")
+os.environ.setdefault("SUPPORT_HOURS", f"{_wd} {(_utcnow + timedelta(hours=2)):%H:%M}-{(_utcnow + timedelta(hours=3)):%H:%M}")
+os.environ.setdefault("SUPPORT_AWAY_MESSAGE",
+                      "¡Gracias por escribirnos! Ahora estamos fuera de horario; te responderemos en horario laboral.")
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402

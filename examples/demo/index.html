@@ -39,6 +39,9 @@
       <p><strong>Visitor context:</strong> on the first message the operator console shows a 🧭 block with the
          page URL/title plus custom fields this page set via <code>window.supportalContext</code> (here:
          <code>plan</code>, <code>account</code>).</p>
+      <p><strong>Business hours:</strong> this demo is rigged to be <em>after hours</em>, so your first message
+         gets an automatic ⏰ "we're away" reply (an operator-side bubble with a clock accent). Configure it with
+         <code>SUPPORT_BUSINESS_HOURS</code> / <code>SUPPORT_HOURS</code> / <code>SUPPORT_AWAY_MESSAGE</code>.</p>
       <p class="hint">The widget token is minted by the demo endpoint <code>POST /support/config</code>;
          the widget API is under <code>/support-api/v1/widget/*</code> (in production a reverse-proxy serves this path).</p>
     </div>

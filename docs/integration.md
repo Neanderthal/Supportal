@@ -55,6 +55,20 @@ survives a reload), and posted into the ticket's Telegram topic (`📊 CSAT: …
 feature on (mirrors `context`/`attachments`). Localize the prompt/thanks copy with the `csatPrompt`/`csatThanks`
 `strings` keys. Each closed conversation can be rated once; a newer close re-arms the prompt.
 
+## Business hours / auto-away (feature `SUPPORT_BUSINESS_HOURS`, default off)
+When on, a ticket opened **outside** the schedule gets a one-time "we're away" auto-reply: an `out` message
+(`kind:"away"`) in the user's feed plus a `⏰ (auto-away)` note in the topic so the operator knows it was sent.
+It fires once, on first contact (topic creation) — it does not nag on every message.
+
+- `SUPPORT_HOURS` — the schedule. `;`-separated `<days> HH:MM-HH:MM` clauses; `<days>` is a range (`mon-fri`),
+  a single day (`sat`) or a comma list (`mon,wed,fri`); `end < start` crosses midnight. **Required** — an empty
+  or unparseable schedule is fail-open (nobody is ever "away", the feature stays inert).
+- `SUPPORT_HOURS_TZ` — IANA timezone the schedule is evaluated in (default `UTC`).
+- `SUPPORT_AWAY_MESSAGE` — the reply text (server-generated, so localize it here, like `SUPPORT_CLOSED_NOTICE`).
+
+No `/support/config` flag is needed (this is purely server-side); the widget renders the away message like any
+operator reply, with a muted "clock accent" style.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

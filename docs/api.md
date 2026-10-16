@@ -22,8 +22,9 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
   `cursor` — the max seq of the response → the client sends it in `?since=` on the next request. `since=0` → the whole feed (restore).
 - The widget reconciles by `id`: new → add; already on screen → update text (edit-sync); `deleted:true` → remove the bubble.
 - `author` for `out` messages is **always "Operator"** (the operator's real name/username is not revealed to the user).
-- `kind ∈ {msg, csat_request, csat}` — `csat_request` marks the close notice under which the widget draws a rating prompt
-  (feature `SUPPORT_CSAT`); `csat` is a recorded rating. `attachment_id > 0` → fetch bytes from `GET /v1/widget/attachment/{id}` (feature `SUPPORT_ATTACHMENTS`).
+- `kind ∈ {msg, csat_request, csat, away}` — `csat_request` marks the close notice under which the widget draws a rating prompt
+  (feature `SUPPORT_CSAT`); `csat` is a recorded rating; `away` is an out-of-hours auto-reply (feature `SUPPORT_BUSINESS_HOURS`).
+  `attachment_id > 0` → fetch bytes from `GET /v1/widget/attachment/{id}` (feature `SUPPORT_ATTACHMENTS`).
 - `401` — missing/expired/forged token. The user sees only their own feed (the token is bound to `user_ref`).
 
 **CSAT rating:** `POST /v1/widget/csat` (feature `SUPPORT_CSAT`, default off)

@@ -10,6 +10,7 @@ import hmac
 import logging
 import time
 
+from .hours import is_within
 from .models import IngressMessage, IngressResult, OperatorEvent
 from .settings import get, get_bool
 from .store import Store
@@ -46,7 +47,8 @@ class Relay:
     async def ingress(self, msg: IngressMessage) -> IngressResult:
         """A user's message → their forum topic (created on the first contact)."""
         ticket = self._store.get_open_by_user(msg.user_ref) or self._store.create(msg.user_ref, msg.display_name)
-        if ticket.thread_id is None:
+        is_new = ticket.thread_id is None
+        if is_new:
             thread_id = await self._tg.ensure_topic(msg.display_name or msg.user_ref)
             self._store.attach_thread(ticket.ticket_id, thread_id)
             ticket.thread_id = thread_id
@@ -59,7 +61,27 @@ class Relay:
         mid = self._store.add_message(ticket.ticket_id, ticket.user_ref, "in",
                                       msg.display_name or msg.user_ref, msg.text)
         _LOG.info("[ingress] ticket=%s thread=%s len=%dchars", ticket.ticket_id, ticket.thread_id, len(msg.text))
+        if is_new:
+            await self._maybe_away(ticket)   # out-of-hours auto-reply, once per ticket (on first contact)
         return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id, message_id=mid)
+
+    async def _maybe_away(self, ticket) -> None:
+        """Feature SUPPORT_BUSINESS_HOURS: when a ticket is opened outside business hours, send a one-time
+        "we're away" auto-reply into the user's feed + a note into the topic. Fail-open on a bad schedule."""
+        if not get_bool("SUPPORT_BUSINESS_HOURS", False):
+            return
+        if is_within(get("SUPPORT_HOURS", ""), get("SUPPORT_HOURS_TZ", "UTC")):
+            return
+        away = get("SUPPORT_AWAY_MESSAGE",
+                   "Thanks for reaching out! We're away right now and will reply during business hours.")
+        if ticket.thread_id is not None:
+            try:
+                await self._tg.send_to_topic(ticket.thread_id, f"⏰ (auto-away) {away}")
+            except Exception:
+                _LOG.warning("[away] failed to post auto-away note into topic thread=%s", ticket.thread_id,
+                             exc_info=True)
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, away, kind="away")
+        _LOG.info("[away] out-of-hours auto-reply sent ticket=%s", ticket.ticket_id)
 
     async def add_user_attachment(self, user_ref: str, display_name: str, data: bytes, filename: str,
                                   mime: str, caption: str = "") -> IngressResult:
