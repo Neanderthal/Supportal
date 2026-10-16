@@ -15,11 +15,13 @@ _LOG = logging.getLogger("supportal.api")
 def build_router(relay: Relay, ingress_secret: str) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/health")
+    @router.get("/health", tags=["health"], summary="Health probe")
     async def health() -> dict:
         return {"status": "ok", "service": "supportal"}
 
-    @router.post("/v1/messages", response_model=IngressResult)
+    @router.post("/v1/messages", response_model=IngressResult, tags=["product"],
+                 summary="Product → relay: a user message",
+                 description="Contour B. HMAC-signed with `SUPPORT_INGRESS_SECRET` via `X-Supportal-Signature`.")
     async def ingress(request: Request, x_supportal_signature: str = Header("")) -> IngressResult:
         body = await request.body()
         if not ingress_secret or not hmac.compare_digest(x_supportal_signature, sign(body, ingress_secret)):

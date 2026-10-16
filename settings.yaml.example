@@ -44,6 +44,10 @@ SUPPORT_CANNED: off
 # /support/config for the widget side. Default: off.
 SUPPORT_RECEIPTS: off
 
+# OpenAPI docs: expose Swagger /docs + ReDoc /redoc + /openapi.json. Off by default (the relay usually sits
+# behind the product's reverse-proxy). ⚠️ Read at STARTUP only — change it, then restart the service.
+SUPPORT_OPENAPI: off
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

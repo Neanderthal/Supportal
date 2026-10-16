@@ -80,9 +80,9 @@ def _auth(authorization: str, secret: str) -> str:
 
 
 def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
-    router = APIRouter(prefix="/v1/widget")
+    router = APIRouter(prefix="/v1/widget", tags=["widget"])
 
-    @router.post("/send")
+    @router.post("/send", summary="Send a user message")
     async def send(body: WidgetSend, authorization: str = Header("")) -> dict:
         user_ref = _auth(authorization, widget_secret)
         if _rate_limited(user_ref):
@@ -99,7 +99,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         _LOG.info("[widget] send user=%s len=%dchars mid=%d", user_ref[:8], len(text), res.message_id)
         return {"ok": True, "message_id": res.message_id}
 
-    @router.get("/messages", response_model=WidgetPoll)
+    @router.get("/messages", response_model=WidgetPoll, summary="Poll the feed (new/edited/deleted) since a cursor")
     async def messages(since: int = 0, authorization: str = Header("")) -> WidgetPoll:
         user_ref = _auth(authorization, widget_secret)
         rows = relay.changes_since(user_ref, since)   # new + edited + deleted (seq cursor)
@@ -111,7 +111,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         cursor = rows[-1].seq if rows else since
         return WidgetPoll(messages=items, cursor=cursor)
 
-    @router.post("/read")
+    @router.post("/read", summary="Report read position (feature SUPPORT_RECEIPTS)")
     async def read(body: WidgetRead, authorization: str = Header("")) -> dict:
         """Feature SUPPORT_RECEIPTS: the widget reports it has seen the feed up to `seq`. The relay marks the
         operator's messages read (and reacts 👀 in Telegram). No-op/`seen:0` when the feature is off."""
@@ -119,7 +119,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         seen = await relay.mark_read(user_ref, body.seq)
         return {"ok": True, "seen": seen}
 
-    @router.post("/upload")
+    @router.post("/upload", summary="Upload a file (feature SUPPORT_ATTACHMENTS)")
     async def upload(request: Request, name: str = "", authorization: str = Header("")) -> dict:
         """Feature SUPPORT_ATTACHMENTS: raw-body file upload (no multipart). Content-Type → mime, ?name= → filename."""
         user_ref = _auth(authorization, widget_secret)
@@ -147,7 +147,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         _LOG.info("[widget] upload user=%s mime=%s size=%d mid=%d", user_ref[:8], mime, len(data), res.message_id)
         return {"ok": True, "message_id": res.message_id, "attachment_id": res.attachment_id}
 
-    @router.post("/csat")
+    @router.post("/csat", summary="Submit a CSAT rating (feature SUPPORT_CSAT)")
     async def csat(body: WidgetCsat, authorization: str = Header("")) -> dict:
         """Feature SUPPORT_CSAT: a satisfaction rating after the operator closed the ticket. 404 when the
         feature is off or there is no ticket to attach it to; 429 when rate-limited."""
@@ -163,7 +163,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         _LOG.info("[widget] csat user=%s score=%d mid=%d", user_ref[:8], body.score, mid)
         return {"ok": True, "message_id": mid}
 
-    @router.get("/attachment/{attachment_id}")
+    @router.get("/attachment/{attachment_id}", summary="Fetch attachment bytes (feature SUPPORT_ATTACHMENTS)")
     async def attachment(attachment_id: int, authorization: str = Header("")) -> Response:
         """Serve attachment bytes to the browser. Bearer-gated + ownership check (own user_ref only)."""
         user_ref = _auth(authorization, widget_secret)

@@ -46,6 +46,10 @@ All notable changes to this project are documented here. The format is based on
   the relay marks the operator's `out` messages read and sets a 👀 reaction on each in Telegram, and the widget
   shows a `✓` delivered tick. The `messages` feed grows a `read` flag (`store.mark_read`, `TelegramOps.react`).
   Needs `receipts:true` in `/support/config`; the demo shows it (mock console renders `✓✓ seen`).
+- OpenAPI docs (`SUPPORT_OPENAPI`, default off): expose Swagger `/docs`, ReDoc `/redoc` and `/openapi.json`,
+  with routes tagged `widget` / `product` / `health` (summaries + response models). Read at startup.
+- Reference product adapter (`examples/product_adapter.py`): a runnable contour-B example — signs messages to
+  the ingress and verifies the operator-reply callback, reporting `delivered` for outbox retry.
 
 ### Changed
 - Refactored the operator-callback boundary (architecture review #7): `TelegramOps.start_polling` /

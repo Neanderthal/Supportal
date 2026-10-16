@@ -40,7 +40,7 @@ maturity as an open‑source platform.
       title / custom fields posted once into the topic for the operator.
 - [x] 🧩 **Rate limiting / basic anti‑spam** on `POST /v1/widget/send` (`SUPPORT_RATE_LIMIT`, default off),
       per `user_ref` sliding window.
-- [ ] ⚙️ **OpenAPI / `/docs`** (free with FastAPI) and a reference product adapter in `examples/`.
+- [x] ⚙️ **OpenAPI / `/docs`** (`SUPPORT_OPENAPI`, default off) + a reference product adapter in `examples/product_adapter.py`.
 
 ## v0.3 — responsiveness & operator convenience
 
