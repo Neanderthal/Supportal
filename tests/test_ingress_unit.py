@@ -56,8 +56,8 @@ def _post(client: TestClient, msg: IngressMessage, secret: str = _INGRESS_SECRET
 def test_ingress_valid_signature_creates_ticket_and_topic():
     tg = _FakeTG()
     client = _client(tg)
-    r = _post(client, IngressMessage(user_ref="eng@x", text="нет давления в контуре",
-                                     display_name="Иванов", meta={"product": "dali-chat", "page": "Husky MM"}))
+    r = _post(client, IngressMessage(user_ref="eng@x", text="не приходит письмо для сброса пароля",
+                                     display_name="Иванов", meta={"product": "web", "page": "Настройки"}))
     assert r.status_code == 200
     data = r.json()
     assert data["ok"] is True and data["ticket_id"]
@@ -65,7 +65,7 @@ def test_ingress_valid_signature_creates_ticket_and_topic():
     # один топик на тикет, одно отправленное сообщение; шапка несёт имя + контекст, тело — текст
     assert len(tg.topics) == 1 and len(tg.sent) == 1
     sent_text = tg.sent[0][1]
-    assert "Иванов" in sent_text and "product=dali-chat" in sent_text and "нет давления в контуре" in sent_text
+    assert "Иванов" in sent_text and "product=web" in sent_text and "не приходит письмо для сброса пароля" in sent_text
 
 
 def test_ingress_bad_signature_401():

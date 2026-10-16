@@ -1,7 +1,7 @@
 """Публичный API браузерного виджета поддержки (token-gated, polling).
 
-Эти роуты — ЕДИНСТВЕННАЯ поверхность relay, доступная браузеру (через Caddy same-origin `/support-api/v1/widget/*`
-на хосте продукта → strip-prefix → сюда). Ingress продукта (`/v1/messages`) наружу НЕ выводится.
+Эти роуты — ЕДИНСТВЕННАЯ поверхность relay, доступная браузеру (через reverse-proxy продукта,
+same-origin `/support-api/v1/widget/*` → strip-prefix → сюда). Ingress продукта (`/v1/messages`) наружу НЕ выводится.
 
 Авторизация: `Authorization: Bearer <token>`, где токен чеканит ПРОДУКТ (знает залогиненного) и подписывает
 общим секретом `SUPPORT_WIDGET_SECRET`. `user_ref` берётся ИЗ ТОКЕНА (сервер), не из тела — анти-спуфинг.

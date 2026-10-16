@@ -24,12 +24,12 @@ class Config:
     # Telegram (сторона оператора)
     tg_bot_token: str          # SUPPORT_TG_BOT_TOKEN — секрет
     tg_group_id: int           # SUPPORT_TG_GROUP_ID — forum-супергруппа поддержки (chat_id, обычно отрицательный)
-    tg_proxy: str              # SUPPORT_TG_PROXY — forward-proxy для egress к Telegram (пусто → напрямую; на Timeweb — через внешний IPv4-хост)
+    tg_proxy: str              # SUPPORT_TG_PROXY — forward-proxy для egress к Telegram (пусто → напрямую; при блокировке egress — через внешний IPv4-хост)
     # HTTP-контракт с продуктом
     product_callback_url: str  # SUPPORT_PRODUCT_CALLBACK_URL — куда POST'ить ответы оператора (пусто → модель «прямой виджет», callback дормант)
     callback_secret: str       # SUPPORT_CALLBACK_SECRET — HMAC relay → продукт
     ingress_secret: str        # SUPPORT_INGRESS_SECRET — HMAC продукт → relay
-    # Браузерный виджет (прямой доступ к relay через Caddy same-origin /support-api)
+    # Браузерный виджет (прямой доступ к relay через reverse-proxy продукта, same-origin /support-api)
     widget_secret: str         # SUPPORT_WIDGET_SECRET — общий с продуктом секрет подписи токена доступа виджета
     allowed_origin: str        # SUPPORT_ALLOWED_ORIGIN — origin продукта для CORS (локальный кросс-оригин dev; пусто → без CORS, облако same-origin)
     # Хранилище и сеть

@@ -15,7 +15,7 @@ from .store import Store
 from .telegram_ops import TelegramOps
 from .widget_api import build_widget_router
 
-logging.basicConfig(level=os.environ.get("RCA_LOG_LEVEL", "INFO"),
+logging.basicConfig(level=os.environ.get("SUPPORT_LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s %(message)s")
 _LOG = logging.getLogger("dali.support")
 
@@ -71,9 +71,9 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     app = FastAPI(title="dali-support", version="0.1.0", lifespan=lifespan)
     app.include_router(build_router(relay, cfg.ingress_secret))
-    # Публичный widget-API (token-gated) — поверхность браузерного виджета. На облаке доступен через
-    # Caddy same-origin `/support-api/v1/widget/*` → без CORS. CORS включаем ТОЛЬКО если задан origin
-    # продукта (локальный кросс-оригин dev: чат :8200 → relay :8500).
+    # Публичный widget-API (token-gated) — поверхность браузерного виджета. В проде доступен через
+    # reverse-proxy продукта (same-origin `/support-api/v1/widget/*`) → без CORS. CORS включаем ТОЛЬКО
+    # если задан origin продукта (локальный кросс-оригин dev: чат → relay :8500).
     app.include_router(build_widget_router(relay, cfg.widget_secret))
     if cfg.allowed_origin:
         from fastapi.middleware.cors import CORSMiddleware

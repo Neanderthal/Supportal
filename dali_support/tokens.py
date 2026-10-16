@@ -4,8 +4,8 @@
 чеканит токен `mint_widget_token(user_ref)`, relay проверяет `verify_widget_token(...)`. Секрет
 `SUPPORT_WIDGET_SECRET` общий у продукта и relay (как ingress/callback-секреты контракта).
 
-Схема (ИСТОЧНИК ПРАВДЫ — этот файл; продукт на другом репо повторяет её 1:1, см.
-rca-chat/support_bridge.py `mint_widget_token`):
+Схема (ИСТОЧНИК ПРАВДЫ — этот файл; продукт в своём репозитории повторяет её 1:1 — минт-функция
+на стороне адаптера продукта):
 
     msg   = f"{b64url(user_ref)}.{exp}"          # exp — unix-секунды (int), без паддинга '='
     sig   = hex(HMAC_SHA256(secret, msg))

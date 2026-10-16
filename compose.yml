@@ -1,5 +1,5 @@
 # dali-support — relay «веб-чат ↔ оператор в Telegram».
-# Co-location рядом с rca-stack (та же docker-сеть) либо отдельный хост, доступный продукту по сети.
+# Co-location рядом с продуктом (та же docker-сеть) либо отдельный хост, доступный продукту по сети.
 services:
   dali-support:
     build: .
