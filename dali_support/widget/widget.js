@@ -25,7 +25,9 @@
   var unread = 0;          // непрочитанные ответы оператора при закрытой панели
   var firstSync = true;    // первый опрос = восстановление (не бейджим историю)
   var isOpen = false;
+  var lastSeq = 0;         // курсор polling по seq (insert/edit/delete)
   var seen = {};           // id → true (дедуп между оптимистичным эхо и polling)
+  var bubbles = {};        // id → DOM-пузырь (для edit-sync: обновить текст; /del: убрать)
   var els = {};            // ссылки на DOM
 
   // ── сеть ───────────────────────────────────────────────────────────────────
@@ -58,12 +60,16 @@
 
   function pollOnce(retried) {
     if (!cfg) return Promise.resolve();
-    return fetch(apiUrl("/v1/widget/messages?after=" + lastId), { headers: authHeaders() })
+    return fetch(apiUrl("/v1/widget/messages?since=" + lastSeq), { headers: authHeaders() })
       .then(function (r) {
         if (r.status === 401 && !retried) return refreshToken().then(function (ok) { return ok ? pollOnce(true) : null; });
         return r.ok ? r.json() : null;
       })
-      .then(function (j) { if (j && j.messages) ingest(j.messages); })
+      .then(function (j) {
+        if (!j) return;
+        if (j.messages) ingest(j.messages);
+        if (typeof j.cursor === "number" && j.cursor > lastSeq) lastSeq = j.cursor;
+      })
       .catch(function () { /* сеть мигнула — следующий тик повторит */ });
   }
 
@@ -75,24 +81,33 @@
   }
 
   // ── лента ────────────────────────────────────────────────────────────────────
+  // Сверка по id: новое → добавить; уже видели → обновить текст (edit-sync); deleted → убрать пузырь.
   function ingest(messages) {
-    var appended = false;
+    var changed = false;
     for (var i = 0; i < messages.length; i++) {
       var m = messages[i];
-      if (seen[m.id]) continue;
+      if (m.deleted) {                       // отозвано оператором (/del) → убрать, пометить как видели
+        if (removeBubble(m.id)) changed = true;
+        seen[m.id] = true;
+        continue;
+      }
+      if (seen[m.id]) {                      // уже на экране → правка текста (edited_message)
+        if (updateBubble(m.id, m.text || "")) changed = true;
+        continue;
+      }
       seen[m.id] = true;
-      if (m.id > lastId) lastId = m.id;
       renderBubble(m);
-      appended = true;
+      changed = true;
       if (m.direction === "out" && !firstSync && !isOpen) unread++;
     }
     firstSync = false;
-    if (appended) { updateBadge(); hideGreetingIfAny(); if (isOpen) scrollToBottom(); }
+    if (changed) { updateBadge(); hideGreetingIfAny(); if (isOpen) scrollToBottom(); }
   }
 
   function renderBubble(m) {
     var row = document.createElement("div");
     row.className = "dali-msg " + (m.direction === "in" ? "dali-in" : "dali-out");
+    row.dataset.mid = m.id;
     if (m.direction === "out" && m.author) {
       var who = document.createElement("div");
       who.className = "dali-msg-author";
@@ -104,6 +119,23 @@
     bub.textContent = m.text || "";          // ВАЖНО: текст из Telegram → только textContent
     row.appendChild(bub);
     els.list.appendChild(row);
+    bubbles[m.id] = bub;                     // для последующих edit/del по id
+  }
+
+  function updateBubble(id, text) {
+    var bub = bubbles[id];
+    if (!bub) return false;
+    bub.textContent = text;                  // правка — тоже только textContent
+    return true;
+  }
+
+  function removeBubble(id) {
+    var bub = bubbles[id];
+    if (!bub) return false;
+    var row = bub.parentNode;                // .dali-msg (внешняя обёртка)
+    if (row && row.parentNode) row.parentNode.removeChild(row);
+    delete bubbles[id];
+    return true;
   }
 
   function renderNote(text) {
@@ -141,7 +173,7 @@
           renderBubble({ id: res.message_id, direction: "in", author: "", text: text });
           hideGreetingIfAny(); scrollToBottom();
         }
-        if (res.message_id > lastId) lastId = res.message_id;
+        // курсор — по seq (его двигает polling); эхо дедупится seen[id], трогать курсор не нужно
       } else {
         renderNote("⚠️ Не удалось отправить сообщение. Попробуйте ещё раз.");
       }

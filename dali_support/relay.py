@@ -52,20 +52,37 @@ class Relay:
         _LOG.info("[ingress] ticket=%s thread=%s len=%dсимв", ticket.ticket_id, ticket.thread_id, len(msg.text))
         return IngressResult(ticket_id=ticket.ticket_id, thread_id=ticket.thread_id, message_id=mid)
 
-    def messages_since(self, user_ref: str, after_id: int):
-        """Лента пользователя с id > after_id — для polling браузерного виджета (см. widget_api)."""
-        return self._store.messages_since(user_ref, after_id)
+    def changes_since(self, user_ref: str, after_seq: int):
+        """Изменения ленты пользователя с seq > after_seq (новые/правленые/удалённые) — polling виджета."""
+        return self._store.changes_since(user_ref, after_seq)
 
-    async def on_operator_message(self, thread_id: int, text: str, operator: str) -> None:
-        """Ответ оператора из топика → в ленту (виджет заберёт polling-ом) + опц. callback продукту."""
+    async def on_operator_message(self, thread_id: int, text: str, operator: str,
+                                  tg_message_id: int = 0) -> None:
+        """Ответ оператора из топика → в ленту (виджет заберёт polling-ом) + опц. callback продукту.
+
+        tg_message_id — id сообщения в Telegram: нужен, чтобы последующий edit/`/del` того же сообщения
+        нашёл эту строку ленты (см. on_operator_edit/on_operator_delete)."""
         ticket = self._store.get_by_thread(thread_id)
         if not ticket:
             _LOG.warning("[reply] ответ в неизвестном топике thread=%s — пропускаю", thread_id)
             return
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", operator or "Поддержка", text)
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", operator or "Поддержка", text,
+                                tg_message_id=tg_message_id)
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
                                            ticket_id=ticket.ticket_id, text=text, operator=operator))
         self._store.touch(ticket.ticket_id)
+
+    async def on_operator_edit(self, tg_message_id: int, new_text: str) -> None:
+        """Оператор отредактировал своё сообщение в Telegram (edited_message) → обновить строку ленты."""
+        row = self._store.update_message_by_tg(tg_message_id, new_text)
+        if row:
+            _LOG.info("[edit] tg_msg=%s обновлено (ticket=%s)", tg_message_id, row.ticket_id)
+
+    async def on_operator_delete(self, tg_message_id: int) -> None:
+        """Оператор отозвал сообщение (`/del` ответом) → мягко удалить строку ленты (виджет уберёт пузырь)."""
+        row = self._store.delete_message_by_tg(tg_message_id)
+        if row:
+            _LOG.info("[del] tg_msg=%s отозвано (ticket=%s)", tg_message_id, row.ticket_id)
 
     async def on_operator_command(self, thread_id: int, command: str, operator: str) -> None:
         """Команды оператора в топике. v1: /close — закрыть тикет (топик можно архивировать отдельно)."""

@@ -35,12 +35,13 @@ def test_no_proxy_default_session():
     assert getattr(tg._bot.session, "_proxy", None) in (None, "")
 
 
-def test_start_polling_registers_two_handlers(monkeypatch):
+def test_start_polling_registers_handlers(monkeypatch):
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
     captured = {}
 
     async def _fake_poll(*bots, **kw):
-        captured["handlers"] = len(tg._dp.message.handlers)
+        captured["msg_handlers"] = len(tg._dp.message.handlers)
+        captured["edit_handlers"] = len(tg._dp.edited_message.handlers)
         captured["handle_signals"] = kw.get("handle_signals")
         captured["close_bot_session"] = kw.get("close_bot_session")
 
@@ -49,31 +50,58 @@ def test_start_polling_registers_two_handlers(monkeypatch):
     async def _noop(*a):
         return None
 
-    asyncio.run(tg.start_polling(_noop, _noop))
-    assert captured == {"handlers": 2, "handle_signals": False, "close_bot_session": False}
+    asyncio.run(tg.start_polling(_noop, _noop, _noop, _noop))
+    # 2 message-хэндлера (команда+текст) + 1 edited_message-хэндлер (edit-sync)
+    assert captured == {"msg_handlers": 2, "edit_handlers": 1,
+                        "handle_signals": False, "close_bot_session": False}
 
 
-def test_handlers_route_command_and_text():
+def _handlers(tg, on_message, on_command, on_edit, on_delete):
+    tg._register_handlers(on_message, on_command, on_edit, on_delete)
+    return (tg._dp.message.handlers[0].callback,      # [0] команда
+            tg._dp.message.handlers[1].callback,      # [1] текст
+            tg._dp.edited_message.handlers[0].callback)  # edited_message
+
+
+def test_handlers_route_command_text_edit_delete():
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
-    seen = {"msg": [], "cmd": []}
+    seen = {"msg": [], "cmd": [], "edit": [], "del": []}
 
-    async def on_message(thread_id, text, operator):
-        seen["msg"].append((thread_id, text, operator))
+    async def on_message(thread_id, text, operator, tg_message_id):
+        seen["msg"].append((thread_id, text, operator, tg_message_id))
 
     async def on_command(thread_id, command, operator):
         seen["cmd"].append((thread_id, command, operator))
 
-    tg._register_handlers(on_message, on_command)
-    # порядок регистрации: [0] команда, [1] текст
-    cmd_handler = tg._dp.message.handlers[0].callback
-    text_handler = tg._dp.message.handlers[1].callback
+    async def on_edit(tg_message_id, text):
+        seen["edit"].append((tg_message_id, text))
 
+    async def on_delete(tg_message_id):
+        seen["del"].append(tg_message_id)
+
+    cmd_handler, text_handler, edit_handler = _handlers(tg, on_message, on_command, on_edit, on_delete)
     user = SimpleNamespace(username="support1", full_name="Пётр", id=7)
-    cmd_msg = SimpleNamespace(message_thread_id=55, from_user=user, text="/close")
-    text_msg = SimpleNamespace(message_thread_id=55, from_user=user, text="проверьте сапун бака")
 
-    asyncio.run(cmd_handler(cmd_msg, command=SimpleNamespace(command="close")))
-    asyncio.run(text_handler(text_msg))
+    # /close → on_command
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/close"),
+                            command=SimpleNamespace(command="close")))
+    # текст → on_message (с message_id)
+    asyncio.run(text_handler(SimpleNamespace(message_thread_id=55, from_user=user,
+                                             text="проверьте сапун бака", message_id=99)))
+    # /del ОТВЕТОМ на сообщение msg_id=42 → on_delete(42); reply не на служебное (forum_topic_created=None)
+    reply = SimpleNamespace(message_id=42, forum_topic_created=None)
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/del",
+                                            reply_to_message=reply),
+                            command=SimpleNamespace(command="del")))
+    # /del без ответа → игнор (ничего не удаляем вслепую)
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/del",
+                                            reply_to_message=None),
+                            command=SimpleNamespace(command="del")))
+    # редактирование сообщения msg_id=42 → on_edit
+    asyncio.run(edit_handler(SimpleNamespace(message_thread_id=55, from_user=user,
+                                             text="проверьте сапун и уровень", message_id=42)))
 
     assert seen["cmd"] == [(55, "/close", "support1")]
-    assert seen["msg"] == [(55, "проверьте сапун бака", "support1")]
+    assert seen["msg"] == [(55, "проверьте сапун бака", "support1", 99)]
+    assert seen["del"] == [42]                               # только валидный reply-таргет
+    assert seen["edit"] == [(42, "проверьте сапун и уровень")]

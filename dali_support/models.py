@@ -23,21 +23,22 @@ class IngressResult(BaseModel):
 
 
 class WidgetMessage(BaseModel):
-    """Строка ленты для браузерного виджета (GET /v1/widget/messages)."""
+    """Строка ленты для браузерного виджета (GET /v1/widget/messages). deleted=true → виджет убирает пузырь."""
 
     id: int
     direction: str          # in | out
     author: str = ""
     text: str = ""
     ts: float = 0.0
+    deleted: bool = False
 
 
 class WidgetPoll(BaseModel):
-    """Ответ polling-опроса виджета: новые сообщения + последний id (курсор следующего запроса)."""
+    """Ответ polling-опроса виджета: изменения (новые/правленые/удалённые) + курсор seq следующего запроса."""
 
     ok: bool = True
     messages: list[WidgetMessage] = Field(default_factory=list)
-    last_id: int = 0
+    cursor: int = 0         # max seq ответа → клиент шлёт его в ?since= следующего опроса
 
 
 class OperatorEvent(BaseModel):

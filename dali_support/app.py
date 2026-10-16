@@ -51,7 +51,9 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
-        poll = asyncio.create_task(tg.start_polling(relay.on_operator_message, relay.on_operator_command))
+        poll = asyncio.create_task(tg.start_polling(
+            relay.on_operator_message, relay.on_operator_command,
+            relay.on_operator_edit, relay.on_operator_delete))
         poll.add_done_callback(_crash_logger("long-polling"))
         outbox = asyncio.create_task(_outbox_loop())
         outbox.add_done_callback(_crash_logger("outbox-retry"))

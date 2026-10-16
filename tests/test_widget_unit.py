@@ -1,13 +1,12 @@
-"""Виджет-API relay (token-gated polling) + лента сообщений + токен доступа.
+"""Виджет-API relay (token-gated polling по seq) + лента + edit-sync/`/del` + токен доступа.
 
-Проверяем: round-trip токена (mint↔verify, подделка/просрочка/пустой секрет), store.add_message/
-messages_since (курсор), HTTP-гейт /v1/widget/{send,messages} (401 без/с плохим токеном, 200 с валидным),
-запись in/out в ленту и дормантность product-callback без callback_url. aiogram/сеть не нужны (фейковый TG).
+Проверяем: round-trip токена; store.add_message/changes_since (курсор seq); edit/delete по tg_message_id
+(правка текста + мягкое удаление, рост seq); HTTP-гейт /v1/widget/{send,messages} (401; форма/порядок;
+deleted в выдаче); дормантность product-callback без callback_url. aiogram/сеть не нужны (фейковый TG).
 """
 import asyncio
 import os
 import tempfile
-import time
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -55,50 +54,68 @@ def _bearer(user_ref: str, secret: str = _SECRET, ttl: int = 900) -> dict:
 def test_token_roundtrip_and_failures():
     t = mint_widget_token("eng@x", _SECRET, 60)
     assert verify_widget_token(t, _SECRET) == "eng@x"
-    assert verify_widget_token(t, "other-secret") is None          # чужой секрет
-    assert verify_widget_token(t[:-1] + ("0" if t[-1] != "0" else "1"), _SECRET) is None  # подделка подписи
-    assert verify_widget_token(mint_widget_token("a", _SECRET, -1), _SECRET) is None       # просрочен
-    assert verify_widget_token(t, "") is None and verify_widget_token("", _SECRET) is None  # пустой секрет/токен
-    assert mint_widget_token("a", "", 60) == ""                     # нет секрета → пустой токен
+    assert verify_widget_token(t, "other-secret") is None
+    assert verify_widget_token(t[:-1] + ("0" if t[-1] != "0" else "1"), _SECRET) is None
+    assert verify_widget_token(mint_widget_token("a", _SECRET, -1), _SECRET) is None
+    assert verify_widget_token(t, "") is None and verify_widget_token("", _SECRET) is None
+    assert mint_widget_token("a", "", 60) == ""
 
 
-# ── store: лента ───────────────────────────────────────────────────────────────
-def test_store_messages_since_cursor():
+# ── store: лента + курсор seq ───────────────────────────────────────────────────
+def test_store_ledger_and_seq_cursor():
     _, store, _, _ = _build()
     m1 = store.add_message("t1", "eng@x", "in", "Иванов", "первое")
     m2 = store.add_message("t1", "eng@x", "out", "Оператор", "ответ")
     store.add_message("t1", "other@y", "in", "Петров", "чужое")   # другой user_ref — не попадёт
-    allm = store.messages_since("eng@x", 0)
-    assert [m.id for m in allm] == [m1, m2]
-    assert [m.direction for m in allm] == ["in", "out"]
-    tail = store.messages_since("eng@x", m1)                      # курсор после первого
-    assert [m.id for m in tail] == [m2]
+    rows = store.changes_since("eng@x", 0)
+    assert [r.id for r in rows] == [m1, m2]
+    assert [r.direction for r in rows] == ["in", "out"]
+    assert rows[0].seq < rows[1].seq                              # seq монотонен
+    tail = store.changes_since("eng@x", rows[0].seq)              # курсор после первого
+    assert [r.id for r in tail] == [m2]
+
+
+def test_store_edit_and_delete_by_tg():
+    _, store, _, _ = _build()
+    store.add_message("t1", "eng@x", "out", "Оператор", "сапун проверьте", tg_message_id=555)
+    seq0 = store.changes_since("eng@x", 0)[-1].seq
+    # edit-sync: правка текста поднимает seq → попадает в changes_since после прежнего курсора
+    store.update_message_by_tg(555, "проверьте сапун и уровень")
+    ch = store.changes_since("eng@x", seq0)
+    assert len(ch) == 1 and ch[0].text == "проверьте сапун и уровень" and ch[0].deleted is False
+    seq1 = ch[0].seq
+    # /del: мягкое удаление — deleted=1, seq ещё выше
+    store.delete_message_by_tg(555)
+    ch2 = store.changes_since("eng@x", seq1)
+    assert len(ch2) == 1 and ch2[0].deleted is True
+    # несуществующий tg → no-op
+    assert store.update_message_by_tg(999, "x") is None
+    assert store.delete_message_by_tg(999) is None
 
 
 # ── HTTP-гейт ───────────────────────────────────────────────────────────────────
 def test_widget_send_requires_token():
     _, _, _, client = _build()
     assert client.post("/v1/widget/send", json={"text": "hi"}).status_code == 401
-    bad = {"Authorization": "Bearer deadbeef"}
-    assert client.post("/v1/widget/send", json={"text": "hi"}, headers=bad).status_code == 401
+    assert client.post("/v1/widget/send", json={"text": "hi"},
+                       headers={"Authorization": "Bearer deadbeef"}).status_code == 401
 
 
 def test_widget_messages_requires_token():
     _, _, _, client = _build()
-    assert client.get("/v1/widget/messages?after=0").status_code == 401
+    assert client.get("/v1/widget/messages?since=0").status_code == 401
 
 
 def test_widget_send_creates_ticket_and_message():
-    _, store, tg, client = _build()
+    _, _, tg, client = _build()
     r = client.post("/v1/widget/send", json={"text": "нет давления"}, headers=_bearer("eng@x"))
     assert r.status_code == 200
     mid = r.json()["message_id"]
-    assert mid > 0
-    assert len(tg.sent) == 1 and "нет давления" in tg.sent[0][1]   # ушло в топик
-    poll = client.get("/v1/widget/messages?after=0", headers=_bearer("eng@x")).json()
-    assert poll["last_id"] == mid
+    assert mid > 0 and len(tg.sent) == 1 and "нет давления" in tg.sent[0][1]
+    poll = client.get("/v1/widget/messages?since=0", headers=_bearer("eng@x")).json()
+    assert poll["cursor"] > 0
     assert [m["direction"] for m in poll["messages"]] == ["in"]
-    assert poll["messages"][0]["text"] == "нет давления"
+    assert poll["messages"][0]["text"] == "нет давления" and poll["messages"][0]["deleted"] is False
 
 
 def test_widget_empty_text_400():
@@ -106,29 +123,38 @@ def test_widget_empty_text_400():
     assert client.post("/v1/widget/send", json={"text": "   "}, headers=_bearer("eng@x")).status_code == 400
 
 
-def test_operator_reply_appears_in_poll_and_callback_dormant():
+def test_operator_reply_poll_and_callback_dormant():
     relay, store, tg, client = _build(callback_url="")   # callback пуст → _dispatch дормант
     client.post("/v1/widget/send", json={"text": "первое"}, headers=_bearer("eng@x"))
     thread_id = store.get_open_by_user("eng@x").thread_id
-    # ответ оператора (в проде — из long-polling топика); callback_url пуст → только запись в ленту, без HTTP
-    asyncio.run(relay.on_operator_message(thread_id, "проверяю, минуту", "Оператор"))
-    poll = client.get("/v1/widget/messages?after=0", headers=_bearer("eng@x")).json()
+    asyncio.run(relay.on_operator_message(thread_id, "проверяю, минуту", "Оператор", 777))
+    poll = client.get("/v1/widget/messages?since=0", headers=_bearer("eng@x")).json()
     assert [m["direction"] for m in poll["messages"]] == ["in", "out"]
     assert poll["messages"][1]["author"] == "Оператор" and poll["messages"][1]["text"] == "проверяю, минуту"
-    # polling с курсором после последнего → пусто, last_id не откатывается
-    after = poll["last_id"]
-    assert client.get(f"/v1/widget/messages?after={after}", headers=_bearer("eng@x")).json()["messages"] == []
+    after = poll["cursor"]
+    assert client.get(f"/v1/widget/messages?since={after}", headers=_bearer("eng@x")).json()["messages"] == []
+
+
+def test_edit_and_delete_surface_in_poll():
+    relay, store, _, client = _build()
+    client.post("/v1/widget/send", json={"text": "вопрос"}, headers=_bearer("eng@x"))
+    thread_id = store.get_open_by_user("eng@x").thread_id
+    asyncio.run(relay.on_operator_message(thread_id, "сапун", "Оператор", 555))
+    cur = client.get("/v1/widget/messages?since=0", headers=_bearer("eng@x")).json()["cursor"]
+    # оператор отредактировал своё сообщение в Telegram → edit-sync
+    asyncio.run(relay.on_operator_edit(555, "проверьте сапун и уровень масла"))
+    ch = client.get(f"/v1/widget/messages?since={cur}", headers=_bearer("eng@x")).json()
+    assert len(ch["messages"]) == 1 and ch["messages"][0]["text"] == "проверьте сапун и уровень масла"
+    assert ch["messages"][0]["deleted"] is False
+    cur2 = ch["cursor"]
+    # оператор отозвал сообщение (/del) → deleted=1
+    asyncio.run(relay.on_operator_delete(555))
+    ch2 = client.get(f"/v1/widget/messages?since={cur2}", headers=_bearer("eng@x")).json()
+    assert len(ch2["messages"]) == 1 and ch2["messages"][0]["deleted"] is True
 
 
 def test_wrong_user_token_sees_only_own_messages():
     _, _, _, client = _build()
     client.post("/v1/widget/send", json={"text": "секрет eng"}, headers=_bearer("eng@x"))
-    other = client.get("/v1/widget/messages?after=0", headers=_bearer("intruder@z")).json()
-    assert other["messages"] == []   # токен привязан к user_ref → чужую ленту не видно
-
-
-def test_token_ttl_future_only():
-    # свежий токен валиден, токен с ttl<=0 — нет (граница exp)
-    assert verify_widget_token(mint_widget_token("a", _SECRET, 1), _SECRET) == "a"
-    time.sleep(0)  # без ожидания: ttl=-1 заведомо в прошлом
-    assert verify_widget_token(mint_widget_token("a", _SECRET, -1), _SECRET) is None
+    other = client.get("/v1/widget/messages?since=0", headers=_bearer("intruder@z")).json()
+    assert other["messages"] == []

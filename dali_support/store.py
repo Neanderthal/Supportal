@@ -47,6 +47,9 @@ class Message:
     author: str          # кто написал (для показа): имя пользователя / оператора / «Система»
     text: str
     created_at: float
+    tg_message_id: int = 0   # message_id в Telegram (для edit-sync и /del; 0 — не из топика)
+    deleted: bool = False    # мягкое удаление (оператор отозвал /del) — виджет убирает пузырь
+    seq: int = 0             # монотонный курсор ИЗМЕНЕНИЙ (insert/edit/delete); polling идёт по нему
 
 
 class Store:
@@ -97,8 +100,23 @@ class Store:
                    direction   TEXT NOT NULL,
                    author      TEXT NOT NULL DEFAULT '',
                    text        TEXT NOT NULL DEFAULT '',
-                   created_at  REAL NOT NULL)""")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_user ON messages(user_ref, id)")
+                   created_at  REAL NOT NULL,
+                   tg_message_id INTEGER,
+                   deleted     INTEGER NOT NULL DEFAULT 0,
+                   seq         INTEGER)""")
+        # Миграция существующей таблицы (первый деплой виджета создал messages без новых колонок): добавить
+        # недостающие + бэкофилл seq=id для старых строк (id монотонен → валидный стартовый курсор).
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(messages)")}
+        if "tg_message_id" not in cols:
+            self._conn.execute("ALTER TABLE messages ADD COLUMN tg_message_id INTEGER")
+        if "deleted" not in cols:
+            self._conn.execute("ALTER TABLE messages ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")
+        if "seq" not in cols:
+            self._conn.execute("ALTER TABLE messages ADD COLUMN seq INTEGER")
+            self._conn.execute("UPDATE messages SET seq=id WHERE seq IS NULL")
+        # polling идёт по seq (insert+edit+delete) + по tg_message_id ищем строку при edit/del
+        self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_seq ON messages(user_ref, seq)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_tg ON messages(tg_message_id)")
         self._conn.commit()
 
     def _row(self, row: sqlite3.Row) -> Ticket:
@@ -182,18 +200,53 @@ class Store:
     def _message_row(self, row: sqlite3.Row) -> Message:
         return Message(id=row["id"], ticket_id=row["ticket_id"], user_ref=row["user_ref"],
                        direction=row["direction"], author=row["author"], text=row["text"],
-                       created_at=row["created_at"])
+                       created_at=row["created_at"], tg_message_id=row["tg_message_id"] or 0,
+                       deleted=bool(row["deleted"]), seq=row["seq"] or 0)
 
-    def add_message(self, ticket_id: str, user_ref: str, direction: str, author: str, text: str) -> int:
-        """Дописать строку в ленту тикета. Возвращает id (монотонный курсор polling)."""
+    def _next_seq(self) -> int:
+        """Монотонный курсор изменений: max(seq)+1. Один писатель (SQLite сериализует) → без гонок."""
+        return (self._conn.execute("SELECT COALESCE(MAX(seq),0)+1 FROM messages").fetchone()[0])
+
+    def add_message(self, ticket_id: str, user_ref: str, direction: str, author: str, text: str,
+                    tg_message_id: int = 0) -> int:
+        """Дописать строку в ленту тикета. tg_message_id — id сообщения в Telegram (для edit/del). Возвращает id."""
         cur = self._conn.execute(
-            "INSERT INTO messages(ticket_id,user_ref,direction,author,text,created_at) VALUES(?,?,?,?,?,?)",
-            (ticket_id, user_ref, direction, author, text, time.time()))
+            "INSERT INTO messages(ticket_id,user_ref,direction,author,text,created_at,tg_message_id,deleted,seq)"
+            " VALUES(?,?,?,?,?,?,?,0,?)",
+            (ticket_id, user_ref, direction, author, text, time.time(), tg_message_id or None, self._next_seq()))
         self._conn.commit()
         return cur.lastrowid or 0
 
-    def messages_since(self, user_ref: str, after_id: int, limit: int = 200) -> list[Message]:
-        """Все сообщения пользователя с id > after_id (по возрастанию). after_id=0 → вся лента (восстановление)."""
+    def _by_tg(self, tg_message_id: int) -> Message | None:
         cur = self._conn.execute(
-            "SELECT * FROM messages WHERE user_ref=? AND id>? ORDER BY id LIMIT ?", (user_ref, after_id, limit))
+            "SELECT * FROM messages WHERE tg_message_id=? AND direction='out' ORDER BY id DESC LIMIT 1",
+            (tg_message_id,))
+        row = cur.fetchone()
+        return self._message_row(row) if row else None
+
+    def update_message_by_tg(self, tg_message_id: int, text: str) -> Message | None:
+        """Edit-sync: оператор отредактировал сообщение в Telegram → обновить текст + поднять seq. None — не нашли."""
+        if not tg_message_id or self._by_tg(tg_message_id) is None:
+            return None
+        self._conn.execute("UPDATE messages SET text=?, seq=? WHERE tg_message_id=? AND direction='out'",
+                           (text, self._next_seq(), tg_message_id))
+        self._conn.commit()
+        return self._by_tg(tg_message_id)
+
+    def delete_message_by_tg(self, tg_message_id: int) -> Message | None:
+        """/del: пометить сообщение удалённым + поднять seq → виджет уберёт пузырь. None — не нашли."""
+        if not tg_message_id or self._by_tg(tg_message_id) is None:
+            return None
+        self._conn.execute("UPDATE messages SET deleted=1, seq=? WHERE tg_message_id=? AND direction='out'",
+                           (self._next_seq(), tg_message_id))
+        self._conn.commit()
+        return self._by_tg(tg_message_id)
+
+    def changes_since(self, user_ref: str, after_seq: int, limit: int = 200) -> list[Message]:
+        """Строки пользователя с seq > after_seq (insert/edit/delete), по возрастанию seq. after_seq=0 → вся лента.
+
+        Содержит и удалённые (deleted=1) — виджет уберёт их пузыри; и отредактированные — обновит текст.
+        Курсор клиента = max(seq) ответа."""
+        cur = self._conn.execute(
+            "SELECT * FROM messages WHERE user_ref=? AND seq>? ORDER BY seq LIMIT ?", (user_ref, after_seq, limit))
         return [self._message_row(r) for r in cur.fetchall()]

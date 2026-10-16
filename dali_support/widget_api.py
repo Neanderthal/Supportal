@@ -50,12 +50,12 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         return {"ok": True, "message_id": res.message_id}
 
     @router.get("/messages", response_model=WidgetPoll)
-    async def messages(after: int = 0, authorization: str = Header("")) -> WidgetPoll:
+    async def messages(since: int = 0, authorization: str = Header("")) -> WidgetPoll:
         user_ref = _auth(authorization, widget_secret)
-        rows = relay.messages_since(user_ref, after)
-        items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text, ts=m.created_at)
-                 for m in rows]
-        last = items[-1].id if items else after
-        return WidgetPoll(messages=items, last_id=last)
+        rows = relay.changes_since(user_ref, since)   # новые + правленые + удалённые (seq-курсор)
+        items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
+                               ts=m.created_at, deleted=m.deleted) for m in rows]
+        cursor = rows[-1].seq if rows else since
+        return WidgetPoll(messages=items, cursor=cursor)
 
     return router
