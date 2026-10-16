@@ -90,6 +90,9 @@ All notable changes to this project are documented here. The format is based on
   Updated the `CONTRIBUTING.md` docs‑language convention to all‑English accordingly.
 
 ### Fixed
+- Business-hours overnight windows now cover the early-morning tail correctly (`supportal/hours.py`): for a
+  single-day window like `fri 22:00-02:00`, Saturday 01:00 was wrongly treated as closed because Saturday
+  isn't in the schedule. The after-midnight tail is now attributed to the start day.
 - Widget polling no longer strands rows from a large `/clear` batch (`supportal/store.py`): `/clear` stamps
   the whole feed with one `seq`, and the client cursor is the page's max `seq`, so a feed larger than the
   200-row page limit left the remaining same-`seq` rows unfetched (stale bubbles surviving a clear).

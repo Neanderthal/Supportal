@@ -52,6 +52,16 @@ def test_overnight_window():
     assert is_within(sched, now=WED.replace(hour=12)) is False
 
 
+def test_overnight_window_single_day_morning_tail():
+    # `fri 22:00-02:00` runs Fri 22:00 → Sat 02:00; the early-Saturday tail belongs to Friday's window even
+    # though Saturday isn't in the schedule.
+    sched = "fri 22:00-02:00"
+    assert is_within(sched, now=datetime(2024, 1, 5, 23, 0)) is True    # Fri 23:00 — evening part
+    assert is_within(sched, now=datetime(2024, 1, 6, 1, 0)) is True     # Sat 01:00 — morning tail (the fix)
+    assert is_within(sched, now=datetime(2024, 1, 6, 3, 0)) is False    # Sat 03:00 — window closed
+    assert is_within(sched, now=datetime(2024, 1, 7, 1, 0)) is False    # Sun 01:00 — not covered
+
+
 def test_fail_open_on_empty_or_unparseable():
     assert is_within("", now=WED) is True                          # no schedule → never "away"
     assert is_within("total nonsense", now=WED) is True
