@@ -31,6 +31,10 @@ All notable changes to this project are documented here. The format is based on
 - Visitor context (`SUPPORT_VISITOR_CONTEXT`, default off): the widget sends page context (URL/title/
   referrer + custom fields from `window.supportalContext`) and the relay posts a one-time "🧭 Visitor
   context" block into a new topic for the operator (capped/sanitized, display-only). The demo shows it.
+- CSAT rating (`SUPPORT_CSAT`, default off): after the operator closes a ticket, the widget shows a 1..5
+  star prompt under the close notice; the rating is recorded as a `kind:"csat"` feed row and posted into the
+  ticket's topic (`POST /v1/widget/csat`). The `messages` feed grows a `kind` column
+  (`msg|csat_request|csat`). The product advertises `csat:true` in `/support/config`; the demo shows it.
 
 ### Changed
 - Translated the whole project to English: the `docs/` design docs, all in‑code comments,

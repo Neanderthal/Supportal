@@ -50,6 +50,7 @@ class Message:
     tg_message_id: int = 0   # message_id in Telegram (for edit-sync and /del; 0 — not from a topic)
     deleted: bool = False    # soft delete (the operator recalled it with /del) — the widget removes the bubble
     seq: int = 0             # monotonic cursor of CHANGES (insert/edit/delete); polling follows it
+    kind: str = "msg"        # msg (normal) | csat_request (close-notice that asks for a rating) | csat (the rating)
     attachment_id: int = 0   # → attachments.id when this row carries a file (0 — text only)
     attachment_name: str = ""  # filename (populated via JOIN in changes_since; "" otherwise)
     attachment_mime: str = ""  # MIME type (populated via JOIN in changes_since)
@@ -120,7 +121,8 @@ class Store:
                    created_at  REAL NOT NULL,
                    tg_message_id INTEGER,
                    deleted     INTEGER NOT NULL DEFAULT 0,
-                   seq         INTEGER)""")
+                   seq         INTEGER,
+                   kind        TEXT NOT NULL DEFAULT 'msg')""")
         # Migrate an existing table (the first widget deploy created messages without the new columns): add
         # the missing ones + backfill seq=id for old rows (id is monotonic → a valid starting cursor).
         cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(messages)")}
@@ -133,6 +135,8 @@ class Store:
             self._conn.execute("UPDATE messages SET seq=id WHERE seq IS NULL")
         if "attachment_id" not in cols:
             self._conn.execute("ALTER TABLE messages ADD COLUMN attachment_id INTEGER")
+        if "kind" not in cols:
+            self._conn.execute("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'msg'")
         # polling follows seq (insert+edit+delete) + we look up the row by tg_message_id on edit/del
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_seq ON messages(user_ref, seq)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS ix_messages_tg ON messages(tg_message_id)")
@@ -158,6 +162,14 @@ class Store:
     def get_open_by_user(self, user_ref: str) -> Ticket | None:
         cur = self._conn.execute(
             "SELECT * FROM tickets WHERE user_ref=? AND status='open' ORDER BY last_at DESC LIMIT 1", (user_ref,))
+        row = cur.fetchone()
+        return self._row(row) if row else None
+
+    def get_last_by_user(self, user_ref: str) -> Ticket | None:
+        """The user's most recent ticket regardless of status (open OR closed). Used to attach a post-close
+        CSAT rating to the ticket/topic it refers to (the just-closed one)."""
+        cur = self._conn.execute(
+            "SELECT * FROM tickets WHERE user_ref=? ORDER BY last_at DESC LIMIT 1", (user_ref,))
         row = cur.fetchone()
         return self._row(row) if row else None
 
@@ -234,6 +246,7 @@ class Store:
                        direction=row["direction"], author=row["author"], text=row["text"],
                        created_at=row["created_at"], tg_message_id=row["tg_message_id"] or 0,
                        deleted=bool(row["deleted"]), seq=row["seq"] or 0,
+                       kind=(row["kind"] or "msg") if "kind" in keys else "msg",
                        attachment_id=(row["attachment_id"] or 0) if "attachment_id" in keys else 0,
                        attachment_name=(row["attachment_name"] or "") if "attachment_name" in keys else "",
                        attachment_mime=(row["attachment_mime"] or "") if "attachment_mime" in keys else "")
@@ -243,14 +256,15 @@ class Store:
         return (self._conn.execute("SELECT COALESCE(MAX(seq),0)+1 FROM messages").fetchone()[0])
 
     def add_message(self, ticket_id: str, user_ref: str, direction: str, author: str, text: str,
-                    tg_message_id: int = 0, attachment_id: int | None = None) -> int:
+                    tg_message_id: int = 0, attachment_id: int | None = None, kind: str = "msg") -> int:
         """Append a row to the ticket feed. tg_message_id — the Telegram message id (for edit/del);
-        attachment_id — → attachments.id when the row carries a file. Returns the id."""
+        attachment_id — → attachments.id when the row carries a file; kind — row type (msg|csat_request|csat).
+        Returns the id."""
         cur = self._conn.execute(
-            "INSERT INTO messages(ticket_id,user_ref,direction,author,text,created_at,tg_message_id,deleted,seq,attachment_id)"
-            " VALUES(?,?,?,?,?,?,?,0,?,?)",
+            "INSERT INTO messages(ticket_id,user_ref,direction,author,text,created_at,tg_message_id,deleted,seq,attachment_id,kind)"
+            " VALUES(?,?,?,?,?,?,?,0,?,?,?)",
             (ticket_id, user_ref, direction, author, text, time.time(), tg_message_id or None,
-             self._next_seq(), attachment_id or None))
+             self._next_seq(), attachment_id or None, kind))
         self._conn.commit()
         return cur.lastrowid or 0
 

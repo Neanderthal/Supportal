@@ -87,6 +87,34 @@ class Relay:
         """Fetch a stored attachment (bytes + metadata) for serving to the browser."""
         return self._store.get_attachment(attachment_id)
 
+    async def submit_csat(self, user_ref: str, score: int, comment: str = "") -> int | None:
+        """A post-close satisfaction rating from the widget (feature SUPPORT_CSAT).
+
+        Records it as a feed row (so it survives reload and the widget shows it) and best-effort posts it into
+        the referred ticket's topic so the operator sees the score. Returns the feed-row id, or None when the
+        feature is off or there is no ticket to attach it to. Score is clamped to 1..5."""
+        if not get_bool("SUPPORT_CSAT", False):
+            return None
+        ticket = self._store.get_last_by_user(user_ref)
+        if not ticket:
+            _LOG.warning("[csat] rating for an unknown user=%s — skipping", user_ref[:8])
+            return None
+        score = max(1, min(5, int(score)))
+        stars = "⭐" * score
+        comment = (comment or "").strip()[:500]
+        feed_text = f"{stars} {score}/5" + (f"\n{comment}" if comment else "")
+        mid = self._store.add_message(ticket.ticket_id, ticket.user_ref, "in",
+                                      ticket.display_name or ticket.user_ref, feed_text, kind="csat")
+        if ticket.thread_id is not None:
+            try:
+                await self._tg.send_to_topic(ticket.thread_id, f"📊 CSAT: {stars} {score}/5"
+                                             + (f"\n{comment}" if comment else ""))
+            except Exception:
+                _LOG.warning("[csat] failed to post rating into topic thread=%s (deleted?) — feed row kept",
+                             ticket.thread_id, exc_info=True)
+        _LOG.info("[csat] ticket=%s score=%d comment=%s", ticket.ticket_id, score, "yes" if comment else "no")
+        return mid
+
     async def on_operator_message(self, thread_id: int, text: str, operator: str,
                                   tg_message_id: int = 0) -> None:
         """An operator reply from the topic → into the feed (the widget picks it up via polling) + an optional callback to the product.
@@ -141,7 +169,9 @@ class Relay:
         if command == "/close":
             self._store.close(ticket.ticket_id)
             notice = get("SUPPORT_CLOSED_NOTICE", "This ticket was closed by the operator.")
-            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, notice)
+            # Feature SUPPORT_CSAT: tag the close notice so the widget renders a rating prompt below it.
+            kind = "csat_request" if get_bool("SUPPORT_CSAT", False) else "msg"
+            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, notice, kind=kind)
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
         elif command == "/clear":

@@ -42,6 +42,11 @@ class WidgetSend(BaseModel):
                           description="Visitor context (url/title/custom); posted once into the topic when SUPPORT_VISITOR_CONTEXT is on.")
 
 
+class WidgetCsat(BaseModel):
+    score: int = Field(..., ge=1, le=5, description="Satisfaction rating 1..5 (feature SUPPORT_CSAT).")
+    comment: str = Field("", description="Optional free-text comment.")
+
+
 def _auth(authorization: str, secret: str) -> str:
     """user_ref from the Bearer token or 401. Fail-closed: empty secret/token/signature/expiry → reject."""
     token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
@@ -76,7 +81,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         user_ref = _auth(authorization, widget_secret)
         rows = relay.changes_since(user_ref, since)   # new + edited + deleted (seq cursor)
         items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
-                               ts=m.created_at, deleted=m.deleted, attachment_id=m.attachment_id,
+                               ts=m.created_at, deleted=m.deleted, kind=m.kind, attachment_id=m.attachment_id,
                                attachment_name=m.attachment_name, attachment_mime=m.attachment_mime)
                  for m in rows]
         cursor = rows[-1].seq if rows else since
@@ -101,6 +106,22 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         res = await relay.add_user_attachment(user_ref, user_ref, data, name or "file", mime, "")
         _LOG.info("[widget] upload user=%s mime=%s size=%d mid=%d", user_ref[:8], mime, len(data), res.message_id)
         return {"ok": True, "message_id": res.message_id, "attachment_id": res.attachment_id}
+
+    @router.post("/csat")
+    async def csat(body: WidgetCsat, authorization: str = Header("")) -> dict:
+        """Feature SUPPORT_CSAT: a satisfaction rating after the operator closed the ticket. 404 when the
+        feature is off or there is no ticket to attach it to; 429 when rate-limited."""
+        user_ref = _auth(authorization, widget_secret)
+        if not get_bool("SUPPORT_CSAT", False):
+            raise HTTPException(status_code=404, detail="csat disabled")
+        if _rate_limited(user_ref):
+            _LOG.warning("[widget] rate-limited (csat) user=%s", user_ref[:8])
+            raise HTTPException(status_code=429, detail="rate limited")
+        mid = await relay.submit_csat(user_ref, body.score, body.comment)
+        if mid is None:
+            raise HTTPException(status_code=404, detail="no ticket to rate")
+        _LOG.info("[widget] csat user=%s score=%d mid=%d", user_ref[:8], body.score, mid)
+        return {"ok": True, "message_id": mid}
 
     @router.get("/attachment/{attachment_id}")
     async def attachment(attachment_id: int, authorization: str = Header("")) -> Response:

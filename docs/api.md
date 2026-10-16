@@ -16,13 +16,24 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 ```
 **Poll:** `GET /v1/widget/messages?since=<seq>`
 ```json
-→ {"messages": [{"id": 12, "direction": "in|out", "author": "Operator", "text": "…", "ts": 1.72e9, "deleted": false}], "cursor": 17}
+→ {"messages": [{"id": 12, "direction": "in|out", "author": "Operator", "text": "…", "ts": 1.72e9, "deleted": false, "kind": "msg", "attachment_id": 0}], "cursor": 17}
 ```
 - Feed changes with `seq > since`, ascending by `seq` (**new + edited + deleted**).
   `cursor` — the max seq of the response → the client sends it in `?since=` on the next request. `since=0` → the whole feed (restore).
 - The widget reconciles by `id`: new → add; already on screen → update text (edit-sync); `deleted:true` → remove the bubble.
 - `author` for `out` messages is **always "Operator"** (the operator's real name/username is not revealed to the user).
+- `kind ∈ {msg, csat_request, csat}` — `csat_request` marks the close notice under which the widget draws a rating prompt
+  (feature `SUPPORT_CSAT`); `csat` is a recorded rating. `attachment_id > 0` → fetch bytes from `GET /v1/widget/attachment/{id}` (feature `SUPPORT_ATTACHMENTS`).
 - `401` — missing/expired/forged token. The user sees only their own feed (the token is bound to `user_ref`).
+
+**CSAT rating:** `POST /v1/widget/csat` (feature `SUPPORT_CSAT`, default off)
+```json
+{"score": 5, "comment": "fast and helpful"}        →  {"ok": true, "message_id": 31}
+```
+- Sent after the operator closes the ticket (the widget shows a 1..5 star prompt under the `csat_request` notice).
+- The rating is recorded as a `kind:"csat"` feed row and posted into the ticket's Telegram topic so the operator sees it.
+- `score` is required and validated to `1..5` (`422` otherwise); `comment` is optional. `404` — feature off or no ticket to rate; `429` — rate-limited.
+- The product must also advertise `csat: true` in `POST /support/config` for the widget to render the prompt.
 
 **Operator commands/edits — via Telegram, NOT via HTTP** (the Bot API does not send bots deletion events):
 - the operator **edits** their message in the topic → the relay catches `edited_message` → the text is updated in the feed
@@ -31,7 +42,7 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 - **`/clear`** → the user's entire feed is marked `deleted` + the topic is deleted (`deleteForumTopic`) + the ticket is
   reset → the widget clears, and the next message creates a fresh topic;
 - **`/help`** → the bot prints a command hint into the topic (it does not go to the user's feed);
-- **`/close`** → close the ticket.
+- **`/close`** → close the ticket (with `SUPPORT_CSAT` on, the user is then shown a rating prompt — see `POST /v1/widget/csat`).
 
 ## 1. Product → relay: `POST /v1/messages` (contour B)
 Secret — `SUPPORT_INGRESS_SECRET`.
