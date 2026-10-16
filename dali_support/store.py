@@ -242,6 +242,15 @@ class Store:
         self._conn.commit()
         return self._by_tg(tg_message_id)
 
+    def clear_messages(self, user_ref: str) -> int:
+        """/clear: пометить ВСЮ ленту пользователя удалённой (один seq на партию) → виджет уберёт все пузыри.
+        Возвращает число затронутых строк. Мягко (deleted=1), чтобы seq оставался монотонным и дошёл polling-ом."""
+        seq = self._next_seq()
+        cur = self._conn.execute(
+            "UPDATE messages SET deleted=1, seq=? WHERE user_ref=? AND deleted=0", (seq, user_ref))
+        self._conn.commit()
+        return cur.rowcount
+
     def changes_since(self, user_ref: str, after_seq: int, limit: int = 200) -> list[Message]:
         """Строки пользователя с seq > after_seq (insert/edit/delete), по возрастанию seq. after_seq=0 → вся лента.
 

@@ -23,6 +23,7 @@ class _FakeTG:
     def __init__(self) -> None:
         self._n = 100
         self.sent: list[tuple[int, str]] = []
+        self.deleted_topics: list[int] = []
 
     async def ensure_topic(self, title: str) -> int:
         self._n += 1
@@ -30,6 +31,9 @@ class _FakeTG:
 
     async def send_to_topic(self, thread_id: int, text: str) -> None:
         self.sent.append((thread_id, text))
+
+    async def delete_topic(self, thread_id: int) -> None:
+        self.deleted_topics.append(thread_id)
 
     async def close(self) -> None:
         return None
@@ -158,3 +162,26 @@ def test_wrong_user_token_sees_only_own_messages():
     client.post("/v1/widget/send", json={"text": "секрет eng"}, headers=_bearer("eng@x"))
     other = client.get("/v1/widget/messages?since=0", headers=_bearer("intruder@z")).json()
     assert other["messages"] == []
+
+
+def test_store_clear_marks_all_deleted():
+    _, store, _, _ = _build()
+    store.add_message("t1", "eng@x", "in", "Иванов", "a")
+    store.add_message("t1", "eng@x", "out", "Оператор", "b")
+    n = store.clear_messages("eng@x")
+    assert n == 2
+    ch = store.changes_since("eng@x", 0)
+    assert len(ch) == 2 and all(m.deleted for m in ch)   # вся лента помечена удалённой
+
+
+def test_operator_clear_wipes_ledger_and_deletes_topic():
+    relay, store, tg, client = _build()
+    client.post("/v1/widget/send", json={"text": "вопрос"}, headers=_bearer("eng@x"))
+    thread_id = store.get_open_by_user("eng@x").thread_id
+    asyncio.run(relay.on_operator_message(thread_id, "ответ", "Оператор", 42))
+    # /clear → очистка ленты + удаление топика + сброс тикета
+    asyncio.run(relay.on_operator_command(thread_id, "/clear", "Оператор"))
+    poll = client.get("/v1/widget/messages?since=0", headers=_bearer("eng@x")).json()
+    assert poll["messages"] and all(m["deleted"] for m in poll["messages"])   # всё удалено → виджет очистит
+    assert tg.deleted_topics == [thread_id]                                    # топик Telegram удалён
+    assert store.get_open_by_user("eng@x") is None                            # тикет сброшен (закрыт)

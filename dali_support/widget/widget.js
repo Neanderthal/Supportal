@@ -8,10 +8,11 @@
 //   GET  {CONFIG_URL}            → {api_base, token, ttl}  (продукт знает залогиненного, чеканит токен)
 //                                   нет токена / не ок → виджет молча не поднимается (self-gating)
 //   POST {api_base}/v1/widget/send      Bearer token  {text}          → {ok, message_id}
-//   GET  {api_base}/v1/widget/messages?after=<id>  Bearer token       → {messages:[{id,direction,author,text,ts}], last_id}
+//   GET  {api_base}/v1/widget/messages?since=<seq>  Bearer token      → {messages:[{id,direction,author,text,ts,deleted}], cursor}
 //
 // Доставка ответов оператора — polling (видимая вкладка ~4с, скрытая реже). `direction`: in = пользователь,
-// out = оператор/система. Текст оператора приходит из Telegram → вставляем ТОЛЬКО как textContent (без innerHTML).
+// out = оператор/система. Сверка по id: новое → добавить; видел → правка текста; deleted → убрать пузырь.
+// Текст оператора приходит из Telegram → вставляем ТОЛЬКО как textContent (без innerHTML).
 (function () {
   "use strict";
   if (window.__daliSupportInit) return;      // один инстанс на страницу
@@ -21,11 +22,10 @@
   var POLL_VISIBLE = 4000, POLL_HIDDEN = 20000;
 
   var cfg = null;          // {api_base, token, ttl}
-  var lastId = 0;          // курсор polling (последний виденный id)
+  var lastSeq = 0;         // курсор polling по seq (insert/edit/delete)
   var unread = 0;          // непрочитанные ответы оператора при закрытой панели
   var firstSync = true;    // первый опрос = восстановление (не бейджим историю)
   var isOpen = false;
-  var lastSeq = 0;         // курсор polling по seq (insert/edit/delete)
   var seen = {};           // id → true (дедуп между оптимистичным эхо и polling)
   var bubbles = {};        // id → DOM-пузырь (для edit-sync: обновить текст; /del: убрать)
   var els = {};            // ссылки на DOM
@@ -101,7 +101,7 @@
       if (m.direction === "out" && !firstSync && !isOpen) unread++;
     }
     firstSync = false;
-    if (changed) { updateBadge(); hideGreetingIfAny(); if (isOpen) scrollToBottom(); }
+    if (changed) { updateBadge(); syncGreeting(); if (isOpen) scrollToBottom(); }
   }
 
   function renderBubble(m) {
@@ -146,7 +146,10 @@
     if (isOpen) scrollToBottom();
   }
 
-  function hideGreetingIfAny() { if (els.greeting) els.greeting.style.display = "none"; }
+  // Показать приветствие, когда лента пуста (в т.ч. после /clear), скрыть — когда есть сообщения.
+  function syncGreeting() {
+    if (els.greeting) els.greeting.style.display = els.list.querySelector(".dali-msg") ? "none" : "";
+  }
   function scrollToBottom() { els.list.scrollTop = els.list.scrollHeight; }
   function updateBadge() {
     if (unread > 0) { els.badge.textContent = unread > 99 ? "99+" : String(unread); els.badge.style.display = ""; }
@@ -171,7 +174,7 @@
         if (!seen[res.message_id]) {   // мог уже прийти polling-ом — тогда не дублируем
           seen[res.message_id] = true;
           renderBubble({ id: res.message_id, direction: "in", author: "", text: text });
-          hideGreetingIfAny(); scrollToBottom();
+          syncGreeting(); scrollToBottom();
         }
         // курсор — по seq (его двигает polling); эхо дедупится seen[id], трогать курсор не нужно
       } else {

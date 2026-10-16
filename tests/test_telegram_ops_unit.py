@@ -9,7 +9,7 @@ start_polling регистрирует 2 хэндлера и зовёт polling 
 import asyncio
 from types import SimpleNamespace
 
-from dali_support.telegram_ops import TelegramOps, operator_name
+from dali_support.telegram_ops import HELP_TEXT, TelegramOps, operator_name
 
 _DUMMY_TOKEN = "123456:abc"      # валиден по формату; сеть не трогается до вызова метода бота
 _GROUP_ID = -1001234567890
@@ -105,3 +105,31 @@ def test_handlers_route_command_text_edit_delete():
     assert seen["msg"] == [(55, "проверьте сапун бака", "support1", 99)]
     assert seen["del"] == [42]                               # только валидный reply-таргет
     assert seen["edit"] == [(42, "проверьте сапун и уровень")]
+
+
+def test_clear_routes_to_command_and_help_posts_to_topic():
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
+    sent = []
+
+    async def _fake_send(thread_id, text):          # /help печатает в топик через self.send_to_topic
+        sent.append((thread_id, text))
+
+    tg.send_to_topic = _fake_send
+    cmds = []
+
+    async def on_command(thread_id, command, operator):
+        cmds.append((thread_id, command, operator))
+
+    async def _noop(*a):
+        return None
+
+    cmd_handler, _text, _edit = _handlers(tg, _noop, on_command, _noop, _noop)
+    user = SimpleNamespace(username="support1", full_name="Пётр", id=7)
+    # /clear → маршрутизируется в on_command (как /close), relay сам чистит обе стороны
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/clear"),
+                            command=SimpleNamespace(command="clear")))
+    # /help → подсказка печатается в топик, on_command НЕ зовётся (operator-facing)
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/help"),
+                            command=SimpleNamespace(command="help")))
+    assert cmds == [(55, "/clear", "support1")]
+    assert sent == [(55, HELP_TEXT)]

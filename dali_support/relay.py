@@ -85,7 +85,7 @@ class Relay:
             _LOG.info("[del] tg_msg=%s отозвано (ticket=%s)", tg_message_id, row.ticket_id)
 
     async def on_operator_command(self, thread_id: int, command: str, operator: str) -> None:
-        """Команды оператора в топике. v1: /close — закрыть тикет (топик можно архивировать отдельно)."""
+        """Команды оператора в топике: /close — закрыть тикет; /clear — очистить обе стороны (лента + топик)."""
         ticket = self._store.get_by_thread(thread_id)
         if not ticket:
             return
@@ -95,6 +95,18 @@ class Relay:
                                     operator or "Поддержка", "Обращение закрыто оператором.")
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
+        elif command == "/clear":
+            # Очистить обе стороны: лента виджета (все строки → deleted, виджет уберёт пузыри) + удалить
+            # топик в Telegram + сбросить тикет (следующее сообщение пользователя создаст свежий топик).
+            n = self._store.clear_messages(ticket.user_ref)
+            self._store.close(ticket.ticket_id)
+            try:
+                await self._tg.delete_topic(thread_id)
+            except Exception:
+                _LOG.warning("[clear] не удалось удалить топик thread=%s (нет прав?) — лента всё равно очищена",
+                             thread_id, exc_info=True)
+            _LOG.info("[clear] ticket=%s очищено (%d строк ленты, топик удалён, тикет сброшен)",
+                      ticket.ticket_id, n)
 
     def _header(self, msg: IngressMessage) -> str:
         """Шапка сообщения в топике: кто пишет + контекст (продукт/страница). Не секрет."""

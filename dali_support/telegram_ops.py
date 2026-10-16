@@ -19,9 +19,20 @@ OnCommand = Callable[[int, str, str], Awaitable[None]]       # (thread_id, comma
 OnEdit = Callable[[int, str], Awaitable[None]]               # (tg_message_id, new_text) → None
 OnDelete = Callable[[int], Awaitable[None]]                  # (tg_message_id) → None
 
-# Команды оператора в топике, которые relay понимает: /close (закрыть тикет), /del (отозвать сообщение —
-# ответом на него); /ban — задел. Telegram НЕ шлёт ботам событий удаления → /del + edit-sync закрывают это.
-_OPERATOR_COMMANDS = ["close", "ban", "del"]
+# Команды оператора в топике: /close (закрыть), /del (отозвать сообщение — ответом), /clear (очистить обе
+# стороны), /help (подсказка), /ban — задел. Telegram НЕ шлёт ботам событий удаления → /del + edit-sync.
+_OPERATOR_COMMANDS = ["close", "ban", "del", "clear", "help"]
+
+# Подсказка оператору (печатается в топик по /help; НЕ уходит пользователю — operator-facing).
+HELP_TEXT = (
+    "🛠 Команды оператора в этом топике:\n"
+    "• Ответить текстом — ответ уйдёт пользователю в чат.\n"
+    "• Отредактировать своё сообщение — правка отразится у пользователя.\n"
+    "• /del (ответом на сообщение) — убрать это сообщение у пользователя.\n"
+    "• /clear — очистить переписку с обеих сторон (у пользователя и здесь; топик будет удалён).\n"
+    "• /close — закрыть обращение.\n"
+    "⚠️ Удаление сообщения средствами Telegram НЕ синхронизируется с чатом — используйте /del."
+)
 
 
 def operator_name(user) -> str:
@@ -52,6 +63,10 @@ class TelegramOps:
     async def send_to_topic(self, thread_id: int, text: str) -> None:
         await self._bot.send_message(chat_id=self._group_id, message_thread_id=thread_id, text=text)
 
+    async def delete_topic(self, thread_id: int) -> None:
+        """Удалить forum-топик целиком (все сообщения в нём) — сторона Telegram для /clear. Нужен can_manage_topics."""
+        await self._bot.delete_forum_topic(chat_id=self._group_id, message_thread_id=thread_id)
+
     def _register_handlers(self, on_message: OnMessage, on_command: OnCommand,
                            on_edit: OnEdit, on_delete: OnDelete) -> None:
         """Хэндлеры топиков супергруппы: /del → отзыв (on_delete), /close|/ban → on_command, текст →
@@ -79,6 +94,11 @@ class TelegramOps:
                     _LOG.info("[op] /del thread=%s target_msg=%s", message.message_thread_id, target)
                 else:
                     _LOG.info("[op] /del без ответа на сообщение thread=%s — игнор", message.message_thread_id)
+                return
+            if command.command == "help":
+                # Подсказка оператору — печатаем прямо в топик, в ленту пользователю НЕ уходит.
+                await self.send_to_topic(message.message_thread_id, HELP_TEXT)
+                _LOG.info("[op] /help thread=%s", message.message_thread_id)
                 return
             await on_command(message.message_thread_id, f"/{command.command}", operator_name(message.from_user))
             _LOG.info("[op] command=/%s thread=%s", command.command, message.message_thread_id)
