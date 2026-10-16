@@ -17,6 +17,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from .flags import Flags
 from .models import IngressMessage, WidgetMessage, WidgetPoll
 from .ratelimit import limiter
 from .relay import Relay
@@ -48,10 +49,10 @@ def _rate_limited(user_ref: str) -> bool:
 
     Flags are read on each call so toggling them in settings.yaml applies live.
     """
-    if not get_bool("SUPPORT_RATE_LIMIT", False):
+    if not get_bool(Flags.RATE_LIMIT, False):
         return False
-    max_hits = get_int("SUPPORT_RATE_LIMIT_MAX", 20)
-    window = get_int("SUPPORT_RATE_LIMIT_WINDOW", 60)
+    max_hits = get_int(Flags.RATE_LIMIT_MAX, 20)
+    window = get_int(Flags.RATE_LIMIT_WINDOW, 60)
     return not limiter.allow(user_ref, max_hits, window)
 
 
@@ -93,7 +94,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
             raise HTTPException(status_code=400, detail="empty text")
         # display_name/meta are NOT taken from the browser (untrusted) — name = user_ref, product is set server-side.
         # Visitor context is display-only and accepted only when the feature is on (relay caps/sanitizes it).
-        ctx = body.context if get_bool("SUPPORT_VISITOR_CONTEXT", False) else {}
+        ctx = body.context if get_bool(Flags.VISITOR_CONTEXT, False) else {}
         res = await relay.ingress(IngressMessage(user_ref=user_ref, text=text, display_name=user_ref,
                                                  meta={"product": "supportal-widget"}, context=ctx))
         _LOG.info("[widget] send user=%s len=%dchars mid=%d", user_ref[:8], len(text), res.message_id)
@@ -123,12 +124,12 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
     async def upload(request: Request, name: str = "", authorization: str = Header("")) -> dict:
         """Feature SUPPORT_ATTACHMENTS: raw-body file upload (no multipart). Content-Type → mime, ?name= → filename."""
         user_ref = _auth(authorization, widget_secret)
-        if not get_bool("SUPPORT_ATTACHMENTS", False):
+        if not get_bool(Flags.ATTACHMENTS, False):
             raise HTTPException(status_code=404, detail="attachments disabled")
         if _rate_limited(user_ref):
             _LOG.warning("[widget] rate-limited (upload) user=%s", user_ref[:8])
             raise HTTPException(status_code=429, detail="rate limited")
-        max_bytes = get_int("SUPPORT_ATTACHMENTS_MAX_MB", 10) * 1024 * 1024
+        max_bytes = get_int(Flags.ATTACHMENTS_MAX_MB, 10) * 1024 * 1024
         # Memory-DoS guard: reject BEFORE buffering when the declared size already exceeds the cap, then
         # stream with a hard cap so a missing/understated Content-Length still can't OOM the process.
         declared = request.headers.get("content-length")
@@ -152,7 +153,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         """Feature SUPPORT_CSAT: a satisfaction rating after the operator closed the ticket. 404 when the
         feature is off or there is no ticket to attach it to; 429 when rate-limited."""
         user_ref = _auth(authorization, widget_secret)
-        if not get_bool("SUPPORT_CSAT", False):
+        if not get_bool(Flags.CSAT, False):
             raise HTTPException(status_code=404, detail="csat disabled")
         if _rate_limited(user_ref):
             _LOG.warning("[widget] rate-limited (csat) user=%s", user_ref[:8])
@@ -167,7 +168,7 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
     async def attachment(attachment_id: int, authorization: str = Header("")) -> Response:
         """Serve attachment bytes to the browser. Bearer-gated + ownership check (own user_ref only)."""
         user_ref = _auth(authorization, widget_secret)
-        if not get_bool("SUPPORT_ATTACHMENTS", False):
+        if not get_bool(Flags.ATTACHMENTS, False):
             raise HTTPException(status_code=404, detail="attachments disabled")
         att = relay.get_attachment(attachment_id)
         if not att or att.user_ref != user_ref:

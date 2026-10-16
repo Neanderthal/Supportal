@@ -10,6 +10,7 @@ import hmac
 import logging
 import time
 
+from .flags import Flags
 from .hours import is_within
 from .models import IngressMessage, IngressResult, OperatorEvent
 from .settings import get, get_bool, get_dict
@@ -46,6 +47,8 @@ class Relay:
         self._callback_secret = callback_secret
         # Outbox retry policy (operator reply to an offline user, boundary A preserved:
         # we retry the HTTP callback and know nothing about the product's sessions — only delivered from the response).
+        # NB: the kwarg defaults above are for DIRECT construction (tests); at runtime app.create_app always
+        # passes Config.from_env values — config.py is the single source of truth for these numbers, not here.
         self._outbox_ttl = outbox_ttl
         self._outbox_max_attempts = outbox_max_attempts
         self._backoff_base = outbox_backoff_base
@@ -64,7 +67,11 @@ class Relay:
                 await self._tg.send_to_topic(thread_id, block)
         await self._tg.send_to_topic(ticket.thread_id, self._header(msg) + msg.text)
         self._store.touch(ticket.ticket_id)
-        # Into the feed (the source of truth for widget polling). We write it AFTER a successful send to the topic.
+        # Into the feed (the source of truth for widget polling). We write it AFTER a successful send to the
+        # topic ON PURPOSE: the operator must receive the message, so we only record it once it's delivered to
+        # Telegram. (The reverse path on_operator_message records first, because there the feed IS the delivery
+        # channel.) A crash strictly between the two is a tolerated edge case: no feed row, so the widget simply
+        # re-sends — preferable to a feed row for a message the operator never saw. See arch review #8.
         mid = self._store.add_message(ticket.ticket_id, ticket.user_ref, "in",
                                       msg.display_name or msg.user_ref, msg.text)
         _LOG.info("[ingress] ticket=%s thread=%s len=%dchars", ticket.ticket_id, ticket.thread_id, len(msg.text))
@@ -75,11 +82,11 @@ class Relay:
     async def _maybe_away(self, ticket) -> None:
         """Feature SUPPORT_BUSINESS_HOURS: when a ticket is opened outside business hours, send a one-time
         "we're away" auto-reply into the user's feed + a note into the topic. Fail-open on a bad schedule."""
-        if not get_bool("SUPPORT_BUSINESS_HOURS", False):
+        if not get_bool(Flags.BUSINESS_HOURS, False):
             return
-        if is_within(get("SUPPORT_HOURS", ""), get("SUPPORT_HOURS_TZ", "UTC")):
+        if is_within(get(Flags.HOURS, ""), get(Flags.HOURS_TZ, "UTC")):
             return
-        away = get("SUPPORT_AWAY_MESSAGE",
+        away = get(Flags.AWAY_MESSAGE,
                    "Thanks for reaching out! We're away right now and will reply during business hours.")
         if ticket.thread_id is not None:
             try:
@@ -120,7 +127,7 @@ class Relay:
         """Read receipt (feature SUPPORT_RECEIPTS): the widget reports it has seen the feed up to `up_to_seq`.
         Mark the operator's `out` messages read and, for each one newly read, set a 👀 reaction on the operator's
         Telegram message so the operator learns the user saw the reply (best-effort). Returns the count."""
-        if not get_bool("SUPPORT_RECEIPTS", False):
+        if not get_bool(Flags.RECEIPTS, False):
             return 0
         tg_ids = self._store.mark_read(user_ref, up_to_seq)
         for mid in tg_ids:
@@ -138,7 +145,7 @@ class Relay:
         Records it as a feed row (so it survives reload and the widget shows it) and best-effort posts it into
         the referred ticket's topic so the operator sees the score. Returns the feed-row id, or None when the
         feature is off or there is no ticket to attach it to. Score is clamped to 1..5."""
-        if not get_bool("SUPPORT_CSAT", False):
+        if not get_bool(Flags.CSAT, False):
             return None
         ticket = self._store.get_last_by_user(user_ref)
         if not ticket:
@@ -198,7 +205,7 @@ class Relay:
     async def on_operator_media(self, thread_id: int, data: bytes, filename: str, mime: str,
                                 caption: str, operator: str, tg_message_id: int = 0) -> None:
         """An operator photo/document from the topic → store the file + a feed row. Gated by SUPPORT_ATTACHMENTS."""
-        if not get_bool("SUPPORT_ATTACHMENTS", False):
+        if not get_bool(Flags.ATTACHMENTS, False):
             _LOG.info("[media] attachments disabled — ignoring operator media thread=%s", thread_id)
             return
         ticket = self._store.get_by_thread(thread_id)
@@ -235,9 +242,9 @@ class Relay:
             return
         if command == "/close":
             self._store.close(ticket.ticket_id)
-            notice = get("SUPPORT_CLOSED_NOTICE", "This ticket was closed by the operator.")
+            notice = get(Flags.CLOSED_NOTICE, "This ticket was closed by the operator.")
             # Feature SUPPORT_CSAT: tag the close notice so the widget renders a rating prompt below it.
-            kind = "csat_request" if get_bool("SUPPORT_CSAT", False) else "msg"
+            kind = "csat_request" if get_bool(Flags.CSAT, False) else "msg"
             self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, notice, kind=kind)
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
@@ -258,11 +265,11 @@ class Relay:
         """Feature SUPPORT_CANNED: expand "/c <key>" to a preset reply and send it to the user (feed `out`
         row + the product callback), with a confirmation note into the topic. Unknown/empty key → list the
         available keys into the topic (operator-facing, nothing goes to the user). Off → operator-facing hint."""
-        if not get_bool("SUPPORT_CANNED", False):
+        if not get_bool(Flags.CANNED, False):
             if ticket.thread_id is not None:
                 await self._tg.send_to_topic(ticket.thread_id, "🗂 Canned replies are disabled (SUPPORT_CANNED).")
             return
-        replies = get_dict("SUPPORT_CANNED_REPLIES", {})
+        replies = get_dict(Flags.CANNED_REPLIES, {})
         if not key or key not in replies:
             available = ", ".join(sorted(replies)) or "(none configured)"
             if ticket.thread_id is not None:
@@ -290,7 +297,7 @@ class Relay:
         Display-only: capped field count/length and newlines stripped (it goes into a plain Telegram message).
         Returns None when the feature is off or there's nothing to show.
         """
-        if not get_bool("SUPPORT_VISITOR_CONTEXT", False) or not isinstance(context, dict) or not context:
+        if not get_bool(Flags.VISITOR_CONTEXT, False) or not isinstance(context, dict) or not context:
             return None
         lines = ["🧭 Visitor context"]
         for key, value in list(context.items())[:12]:
