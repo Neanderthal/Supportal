@@ -1,4 +1,13 @@
-"""ASGI entry point: assemble config/store/Telegram/relay, start FastAPI + a background long-polling loop."""
+"""ASGI entry point: assemble config/store/Telegram/relay, start FastAPI + a background long-polling loop.
+
+⚠️ SINGLE-PROCESS SERVICE (hard invariant). The Telegram long-poller, the outbox-retry loop and the
+in-memory rate limiter (ratelimit.py) are per-process singletons. Run EXACTLY ONE process: do NOT start
+uvicorn with `--workers >1` and do NOT run multiple replicas. Two processes mean two `getUpdates` consumers
+(Telegram answers one with 409 Conflict — replies silently split), double outbox delivery and per-worker
+(not global) rate limits. Swapping the SQLite store for Postgres does NOT lift this limit by itself —
+horizontal scale-out additionally needs the poller/outbox to run as a single leader. See
+docs/architecture.md (§Scaling) and docs/integration.md (§Deploying).
+"""
 from __future__ import annotations
 
 import asyncio
@@ -57,8 +66,9 @@ def create_app(config: Config | None = None) -> FastAPI:
         poll.add_done_callback(_crash_logger("long-polling"))
         outbox = asyncio.create_task(_outbox_loop())
         outbox.add_done_callback(_crash_logger("outbox-retry"))
-        _LOG.info("[app] supportal is up: supergroup long-polling + outbox retry (period %ds)",
-                  cfg.outbox_retry_interval)
+        _LOG.info("[app] supportal up — SINGLE-PROCESS: one long-poller + one outbox loop + in-memory rate "
+                  "limiter. Do NOT run --workers>1 or multiple replicas (409 Conflict / double delivery). "
+                  "Outbox retry period %ds.", cfg.outbox_retry_interval)
         try:
             yield
         finally:

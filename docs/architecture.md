@@ -57,5 +57,20 @@ outbox(id PK AUTOINCREMENT, ticket_id, user_ref, event, text, operator, status '
 - **`outbox`** (contour B) — operator replies the product did not confirm as delivered; a background loop
   retries the callback with backoff until `delivered>0` or TTL.
 
-For a multi-user / fault-tolerant setup — Postgres behind the same `store.Store` interface
+For larger-corpus / fault-tolerant storage — Postgres behind the same `store.Store` interface
 (swapped in `app.create_app`); the schema and methods are in `supportal/store.py`.
+
+## Scaling (single-process invariant)
+
+**supportal runs as exactly one process.** The Telegram long-poller, the outbox-retry loop and the
+in-memory rate limiter (`ratelimit.py`) are all per-process singletons. Do **not** run `uvicorn --workers >1`
+or multiple replicas:
+
+- Two `getUpdates` consumers → Telegram answers one with **409 Conflict**; operator replies split silently.
+- The outbox loop would deliver each retry **twice** (once per process).
+- The rate limiter is in-memory, so limits become **per-worker**, not global.
+
+Swapping SQLite for **Postgres does not lift this by itself** — it only makes the *store* shared. Horizontal
+scale-out additionally requires electing a **single leader** for the poller + outbox (and a shared rate
+limiter, e.g. Redis). Until that exists, treat "one process" as a hard deployment constraint — it is stated
+loudly at startup (the `app.create_app` lifespan log) and in the module docstring of `supportal/app.py`.
