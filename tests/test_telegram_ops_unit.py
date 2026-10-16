@@ -35,6 +35,19 @@ def test_no_proxy_default_session():
     assert getattr(tg._bot.session, "_proxy", None) in (None, "")
 
 
+def test_react_sets_message_reaction():
+    # feature SUPPORT_RECEIPTS: react() calls set_message_reaction with the given emoji on OUR group
+    tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
+    calls = []
+
+    async def _fake_react(*, chat_id, message_id, reaction):
+        calls.append((chat_id, message_id, reaction[0].emoji))
+
+    tg._bot.set_message_reaction = _fake_react
+    asyncio.run(tg.react(777, "👀"))
+    assert calls == [(_GROUP_ID, 777, "👀")]
+
+
 def test_start_polling_registers_handlers(monkeypatch):
     tg = TelegramOps(_DUMMY_TOKEN, _GROUP_ID)
     captured = {}

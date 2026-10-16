@@ -87,7 +87,7 @@
           <div class="msgs">${t.messages.map(m => `
             <div class="m ${m.direction === "in" ? "in" : "out"} ${m.deleted ? "del" : ""}">${esc(m.text)}${media(m)}${
               m.direction === "out" && !m.deleted
-                ? `<div class="meta"><a onclick="edit(${m.tg_message_id})">edit</a> · <a onclick="del(${m.tg_message_id})">delete</a></div>`
+                ? `<div class="meta"><a onclick="edit(${m.tg_message_id})">edit</a> · <a onclick="del(${m.tg_message_id})">delete</a>${m.read ? ' · <span style="color:#6ab0ff">✓✓ seen</span>' : ""}</div>`
                 : ""
             }</div>`).join("")}</div>
           <div class="row">

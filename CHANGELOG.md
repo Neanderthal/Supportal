@@ -42,6 +42,10 @@ All notable changes to this project are documented here. The format is based on
 - Canned responses (`SUPPORT_CANNED`, default off): the operator types `/c <key>` in the topic to send a
   preset reply (`/c` alone lists the keys). Presets are `SUPPORT_CANNED_REPLIES` (a YAML map, or a `k=v;k=v`
   env string); `settings.get_dict` added. Operator-side only (no widget surface); the demo ships Spanish presets.
+- Read receipts (`SUPPORT_RECEIPTS`, default off): the widget reports what it has seen (`POST /v1/widget/read`);
+  the relay marks the operator's `out` messages read and sets a 👀 reaction on each in Telegram, and the widget
+  shows a `✓` delivered tick. The `messages` feed grows a `read` flag (`store.mark_read`, `TelegramOps.react`).
+  Needs `receipts:true` in `/support/config`; the demo shows it (mock console renders `✓✓ seen`).
 
 ### Changed
 - Documented the **single-process invariant** (architecture review #3): the Telegram long-poller, the

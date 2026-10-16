@@ -34,6 +34,7 @@ class WidgetMessage(BaseModel):
     ts: float = 0.0
     deleted: bool = False
     kind: str = "msg"       # csat_request → the widget shows a rating prompt below this row (feature SUPPORT_CSAT)
+    read: bool = False      # an operator (out) message the user has seen (feature SUPPORT_RECEIPTS)
     attachment_id: int = 0  # >0 → fetch bytes from /v1/widget/attachment/{id}
     attachment_name: str = ""
     attachment_mime: str = ""

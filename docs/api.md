@@ -16,7 +16,7 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 ```
 **Poll:** `GET /v1/widget/messages?since=<seq>`
 ```json
-→ {"messages": [{"id": 12, "direction": "in|out", "author": "Operator", "text": "…", "ts": 1.72e9, "deleted": false, "kind": "msg", "attachment_id": 0}], "cursor": 17}
+→ {"messages": [{"id": 12, "direction": "in|out", "author": "Operator", "text": "…", "ts": 1.72e9, "deleted": false, "kind": "msg", "read": false, "attachment_id": 0}], "cursor": 17}
 ```
 - Feed changes with `seq > since`, ascending by `seq` (**new + edited + deleted**).
   `cursor` — the max seq of the response → the client sends it in `?since=` on the next request. `since=0` → the whole feed (restore).
@@ -25,7 +25,17 @@ the scheme is in `supportal/tokens.py`). `user_ref` comes from the token (server
 - `kind ∈ {msg, csat_request, csat, away}` — `csat_request` marks the close notice under which the widget draws a rating prompt
   (feature `SUPPORT_CSAT`); `csat` is a recorded rating; `away` is an out-of-hours auto-reply (feature `SUPPORT_BUSINESS_HOURS`).
   `attachment_id > 0` → fetch bytes from `GET /v1/widget/attachment/{id}` (feature `SUPPORT_ATTACHMENTS`).
+- `read: true` on an `out` row — the user has acknowledged seeing it (feature `SUPPORT_RECEIPTS`); only the operator side surfaces it.
 - `401` — missing/expired/forged token. The user sees only their own feed (the token is bound to `user_ref`).
+
+**Read receipt:** `POST /v1/widget/read` (feature `SUPPORT_RECEIPTS`, default off)
+```json
+{"seq": 17}                                        →  {"ok": true, "seen": 2}
+```
+- The widget reports the max feed `seq` it has displayed (while the panel is open). The relay marks the operator's
+  `out` messages up to that `seq` as read and sets a 👀 reaction on each in Telegram so the operator learns the user saw the reply.
+- `seen` — how many operator messages were newly marked read. Feature off → `{"ok": true, "seen": 0}` (no-op). Idempotent.
+- The product should advertise `receipts: true` in `POST /support/config` for the widget to report reads + show delivered ticks.
 
 **CSAT rating:** `POST /v1/widget/csat` (feature `SUPPORT_CSAT`, default off)
 ```json

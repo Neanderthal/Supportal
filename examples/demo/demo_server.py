@@ -46,6 +46,7 @@ os.environ.setdefault("SUPPORT_AWAY_MESSAGE",
 os.environ.setdefault("SUPPORT_CANNED", "on")
 os.environ.setdefault("SUPPORT_CANNED_REPLIES",
                       "saludo=¡Hola! ¿En qué puedo ayudarte?;horario=Atendemos de lunes a viernes, 9:00–18:00.")
+os.environ.setdefault("SUPPORT_RECEIPTS", "on")   # read receipts: ✓ delivered + the operator console shows "seen"
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
@@ -98,6 +99,9 @@ class FakeTelegramOps:
     async def send_media(self, thread_id: int, data: bytes, filename: str, mime: str, caption: str = "") -> None:
         return None   # the user's file is already stored by the relay; nothing to deliver to real Telegram
 
+    async def react(self, tg_message_id: int, emoji: str = "👀") -> None:
+        return None   # a real bot would setMessageReaction; here the console shows "seen" from the read flag
+
     async def delete_topic(self, thread_id: int) -> None:
         self.threads.pop(thread_id, None)
 
@@ -125,7 +129,8 @@ app.include_router(build_widget_router(relay, DEMO_SECRET), prefix="/support-api
 async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
-            "ttl": 900, "attachments": True, "context": True, "csat": True, "strings": DEMO_STRINGS}
+            "ttl": 900, "attachments": True, "context": True, "csat": True, "receipts": True,
+            "strings": DEMO_STRINGS}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────
@@ -149,7 +154,7 @@ class CloseIn(BaseModel):
 
 def _conversation(user_ref: str) -> list[dict]:
     return [{"id": m.id, "direction": m.direction, "author": m.author, "text": m.text,
-             "deleted": m.deleted, "tg_message_id": m.tg_message_id,
+             "deleted": m.deleted, "read": m.read, "tg_message_id": m.tg_message_id,
              "attachment_id": m.attachment_id, "attachment_name": m.attachment_name,
              "attachment_mime": m.attachment_mime}
             for m in store.changes_since(user_ref, 0)]

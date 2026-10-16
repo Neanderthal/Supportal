@@ -78,6 +78,13 @@ class TelegramOps:
         """Delete the forum topic entirely (all messages in it) — the Telegram side of /clear. Requires can_manage_topics."""
         await self._bot.delete_forum_topic(chat_id=self._group_id, message_thread_id=thread_id)
 
+    async def react(self, tg_message_id: int, emoji: str = "👀") -> None:
+        """Set a reaction on a message in the supergroup (feature SUPPORT_RECEIPTS: 👀 = the user saw the reply).
+        Best-effort — the caller swallows failures (the bot may lack permission, or the message may be gone)."""
+        from aiogram.types import ReactionTypeEmoji
+        await self._bot.set_message_reaction(chat_id=self._group_id, message_id=tg_message_id,
+                                             reaction=[ReactionTypeEmoji(emoji=emoji)])
+
     async def send_media(self, thread_id: int, data: bytes, filename: str, mime: str, caption: str = "") -> None:
         """Send a file into the topic: a photo for images (inline), a document otherwise."""
         from aiogram.types import BufferedInputFile

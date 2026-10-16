@@ -123,6 +123,7 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` �
 | `SUPPORT_AWAY_MESSAGE` | (built-in) | the out-of-hours auto-reply text |
 | `SUPPORT_CANNED` | off | operator sends a preset reply by typing `/c <key>` in the topic (`/c` lists them) |
 | `SUPPORT_CANNED_REPLIES` | — | the preset map: a YAML mapping in `settings.yaml`, or a `k=v;k=v` string in the env |
+| `SUPPORT_RECEIPTS` | off | read receipts: user's read → 👀 reaction in Telegram + a delivered tick in the widget (needs `receipts:true` in `/support/config`) |
 
 ## HTTP API
 

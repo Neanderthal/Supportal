@@ -66,6 +66,10 @@ class WidgetCsat(BaseModel):
     comment: str = Field("", description="Optional free-text comment.")
 
 
+class WidgetRead(BaseModel):
+    seq: int = Field(..., ge=0, description="The max feed seq the widget has displayed (feature SUPPORT_RECEIPTS).")
+
+
 def _auth(authorization: str, secret: str) -> str:
     """user_ref from the Bearer token or 401. Fail-closed: empty secret/token/signature/expiry → reject."""
     token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
@@ -100,11 +104,20 @@ def build_widget_router(relay: Relay, widget_secret: str) -> APIRouter:
         user_ref = _auth(authorization, widget_secret)
         rows = relay.changes_since(user_ref, since)   # new + edited + deleted (seq cursor)
         items = [WidgetMessage(id=m.id, direction=m.direction, author=m.author, text=m.text,
-                               ts=m.created_at, deleted=m.deleted, kind=m.kind, attachment_id=m.attachment_id,
+                               ts=m.created_at, deleted=m.deleted, kind=m.kind, read=m.read,
+                               attachment_id=m.attachment_id,
                                attachment_name=m.attachment_name, attachment_mime=m.attachment_mime)
                  for m in rows]
         cursor = rows[-1].seq if rows else since
         return WidgetPoll(messages=items, cursor=cursor)
+
+    @router.post("/read")
+    async def read(body: WidgetRead, authorization: str = Header("")) -> dict:
+        """Feature SUPPORT_RECEIPTS: the widget reports it has seen the feed up to `seq`. The relay marks the
+        operator's messages read (and reacts 👀 in Telegram). No-op/`seen:0` when the feature is off."""
+        user_ref = _auth(authorization, widget_secret)
+        seen = await relay.mark_read(user_ref, body.seq)
+        return {"ok": True, "seen": seen}
 
     @router.post("/upload")
     async def upload(request: Request, name: str = "", authorization: str = Header("")) -> dict:

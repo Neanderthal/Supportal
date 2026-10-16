@@ -109,6 +109,22 @@ class Relay:
         """Fetch a stored attachment (bytes + metadata) for serving to the browser."""
         return self._store.get_attachment(attachment_id)
 
+    async def mark_read(self, user_ref: str, up_to_seq: int) -> int:
+        """Read receipt (feature SUPPORT_RECEIPTS): the widget reports it has seen the feed up to `up_to_seq`.
+        Mark the operator's `out` messages read and, for each one newly read, set a 👀 reaction on the operator's
+        Telegram message so the operator learns the user saw the reply (best-effort). Returns the count."""
+        if not get_bool("SUPPORT_RECEIPTS", False):
+            return 0
+        tg_ids = self._store.mark_read(user_ref, up_to_seq)
+        for mid in tg_ids:
+            try:
+                await self._tg.react(mid, "👀")
+            except Exception:
+                _LOG.warning("[read] failed to set a seen reaction on tg_msg=%s", mid, exc_info=True)
+        if tg_ids:
+            _LOG.info("[read] user=%s marked %d operator message(s) seen", user_ref[:8], len(tg_ids))
+        return len(tg_ids)
+
     async def submit_csat(self, user_ref: str, score: int, comment: str = "") -> int | None:
         """A post-close satisfaction rating from the widget (feature SUPPORT_CSAT).
 
