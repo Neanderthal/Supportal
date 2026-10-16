@@ -172,3 +172,22 @@ def test_download_filename_sanitized_no_header_injection(tmp_path, monkeypatch):
     cd = g.headers["content-disposition"]
     assert "\r" not in cd and "\n" not in cd and cd.count('"') == 2
     assert "filename*=UTF-8''" in cd
+
+
+def test_attachment_serve_nosniff_and_svg_forced_download(tmp_path, monkeypatch):
+    _force_env_only(tmp_path); monkeypatch.setenv("SUPPORT_ATTACHMENTS", "on")
+    path = os.path.join(tempfile.mkdtemp(prefix="supportal_att_"), "t.db")
+    store = Store(f"sqlite:///{path}"); store.bootstrap()
+    png = store.add_attachment("u1", "in", "a.png", "image/png", _PNG)
+    svg = store.add_attachment("u1", "in", "x.svg", "image/svg+xml", b"<svg onload=alert(1)/>")
+    relay = Relay(store, _FakeTG(), "", "")
+    app = FastAPI(); app.include_router(build_widget_router(relay, _SECRET))
+    client = TestClient(app); hdr = _auth(mint_widget_token("u1", _SECRET))
+    # raster image → inline, but always nosniff
+    rp = client.get("/v1/widget/attachment/" + str(png), headers=hdr)
+    assert rp.status_code == 200 and rp.headers["x-content-type-options"] == "nosniff"
+    assert "content-disposition" not in rp.headers
+    # svg → forced download (never inline) + nosniff
+    rs = client.get("/v1/widget/attachment/" + str(svg), headers=hdr)
+    assert rs.status_code == 200 and rs.headers["x-content-type-options"] == "nosniff"
+    assert rs.headers["content-disposition"].startswith("attachment")
