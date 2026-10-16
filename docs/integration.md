@@ -69,6 +69,17 @@ It fires once, on first contact (topic creation) — it does not nag on every me
 No `/support/config` flag is needed (this is purely server-side); the widget renders the away message like any
 operator reply, with a muted "clock accent" style.
 
+## Canned responses (feature `SUPPORT_CANNED`, default off)
+Operator-side quick replies, offloaded to Telegram (no agent console). The operator types **`/c <key>`** in the
+topic; the relay expands it to the matching preset, sends it to the user (a normal `out` reply) and posts a
+`↩️ (canned: <key>)` confirmation into the topic. `/c` with no key (or an unknown one) lists the available keys
+in the topic. Nothing is exposed to the browser widget — this is purely an operator convenience.
+
+- `SUPPORT_CANNED_REPLIES` — the `key → text` map. In `settings.yaml` write it as a nested mapping; via the
+  environment use a `key=text;key=text` string. Keys are what the operator types after `/c`.
+
+Because presets live in `settings.yaml`, they can be edited live (no restart), like the other settings.
+
 ## Telegram-side setup (one-time)
 1. Create a bot with @BotFather → `SUPPORT_TG_BOT_TOKEN`.
 2. Create a support **supergroup** and enable **Topics** (forum topics) in it.

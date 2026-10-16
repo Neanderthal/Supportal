@@ -133,7 +133,13 @@ def test_clear_routes_to_command_and_help_posts_to_topic():
     # /help → the hint is printed to the topic, on_command is NOT called (operator-facing)
     asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/help"),
                             command=SimpleNamespace(command="help")))
-    assert cmds == [(55, "/clear", "support1")]
+    # /c saludo → forwarded to on_command as "/c saludo" (the arg is carried; the relay expands the preset)
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/c saludo"),
+                            command=SimpleNamespace(command="c", args="saludo")))
+    # /c with no arg → "/c" (the relay lists the keys)
+    asyncio.run(cmd_handler(SimpleNamespace(message_thread_id=55, from_user=user, text="/c"),
+                            command=SimpleNamespace(command="c", args=None)))
+    assert cmds == [(55, "/clear", "support1"), (55, "/c saludo", "support1"), (55, "/c", "support1")]
     assert sent == [(55, HELP_TEXT)]
 
 

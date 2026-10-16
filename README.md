@@ -121,6 +121,8 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` �
 | `SUPPORT_HOURS` | — | schedule, e.g. `mon-fri 09:00-18:00; sat 10:00-14:00` (`;`-separated `<days> HH:MM-HH:MM`) |
 | `SUPPORT_HOURS_TZ` | UTC | IANA timezone for the schedule (e.g. `Europe/Moscow`) |
 | `SUPPORT_AWAY_MESSAGE` | (built-in) | the out-of-hours auto-reply text |
+| `SUPPORT_CANNED` | off | operator sends a preset reply by typing `/c <key>` in the topic (`/c` lists them) |
+| `SUPPORT_CANNED_REPLIES` | — | the preset map: a YAML mapping in `settings.yaml`, or a `k=v;k=v` string in the env |
 
 ## HTTP API
 

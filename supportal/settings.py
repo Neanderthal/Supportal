@@ -86,3 +86,20 @@ def get_float(name: str, default: float = 0.0) -> float:
         return float(v) if v is not None else default
     except (TypeError, ValueError):
         return default
+
+
+def get_dict(name: str, default: dict | None = None) -> dict:
+    """A string→string map. From settings.yaml — a nested mapping; from env — a ``k=v;k=v`` string.
+    Empty/absent/wrong type → `default` (or {}). Used e.g. for SUPPORT_CANNED_REPLIES (canned responses)."""
+    v = get(name, None)
+    if isinstance(v, dict):
+        return {str(k): str(val) for k, val in v.items()}
+    if isinstance(v, str) and v.strip():
+        out: dict = {}
+        for pair in v.split(";"):
+            if "=" in pair:
+                k, val = pair.split("=", 1)
+                if k.strip():
+                    out[k.strip()] = val.strip()
+        return out
+    return {} if default is None else default

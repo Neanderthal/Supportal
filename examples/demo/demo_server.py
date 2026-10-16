@@ -42,6 +42,10 @@ os.environ.setdefault("SUPPORT_HOURS_TZ", "UTC")
 os.environ.setdefault("SUPPORT_HOURS", f"{_wd} {(_utcnow + timedelta(hours=2)):%H:%M}-{(_utcnow + timedelta(hours=3)):%H:%M}")
 os.environ.setdefault("SUPPORT_AWAY_MESSAGE",
                       "¡Gracias por escribirnos! Ahora estamos fuera de horario; te responderemos en horario laboral.")
+# Canned responses: a couple of Spanish presets — in the operator console, type "/c saludo" or "/c horario".
+os.environ.setdefault("SUPPORT_CANNED", "on")
+os.environ.setdefault("SUPPORT_CANNED_REPLIES",
+                      "saludo=¡Hola! ¿En qué puedo ayudarte?;horario=Atendemos de lunes a viernes, 9:00–18:00.")
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import HTMLResponse  # noqa: E402
@@ -214,6 +218,20 @@ async def op_delete(body: DeleteIn) -> dict:
 @app.post("/op/api/close")
 async def op_close(body: CloseIn) -> dict:
     await relay.on_operator_command(body.thread_id, "/close", "Operator (demo)")
+    return {"ok": True}
+
+
+class CommandIn(BaseModel):
+    thread_id: int
+    command: str        # e.g. "/c saludo" (canned reply) or "/c" (list) — stands in for typing it in the topic
+
+
+@app.post("/op/api/command")
+async def op_command(body: CommandIn) -> dict:
+    """Run an operator command (stands in for typing it in the Telegram topic). Used by the console for "/c <key>"."""
+    if not store.get_by_thread(body.thread_id):
+        raise HTTPException(status_code=404, detail="unknown thread")
+    await relay.on_operator_command(body.thread_id, body.command.strip(), "Operator (demo)")
     return {"ok": True}
 
 

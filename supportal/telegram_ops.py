@@ -30,8 +30,8 @@ OnDelete = Callable[[int], Awaitable[None]]                  # (tg_message_id) �
 OnMedia = Callable[[int, bytes, str, str, str, str, int], Awaitable[None]]
 
 # Operator commands in the topic: /close (close), /del (recall a message — as a reply), /clear (clear both
-# sides), /help (hint), /ban — reserved. Telegram does NOT send bots deletion events → /del + edit-sync.
-_OPERATOR_COMMANDS = ["close", "ban", "del", "clear", "help"]
+# sides), /help (hint), /c <key> (canned reply), /ban — reserved. Telegram does NOT send bots deletion events → /del + edit-sync.
+_OPERATOR_COMMANDS = ["close", "ban", "del", "clear", "help", "c"]
 
 # Hint for the operator (printed into the topic on /help; does NOT go to the user — operator-facing).
 HELP_TEXT = (
@@ -39,6 +39,7 @@ HELP_TEXT = (
     "• Reply with text — the reply goes to the user's chat.\n"
     "• Edit your own message — the change is reflected for the user.\n"
     "• /del (as a reply to a message) — remove that message from the user.\n"
+    "• /c <key> — send a canned reply (feature SUPPORT_CANNED; /c with no key lists them).\n"
     "• /clear — clear the conversation on both sides (for the user and here; the topic will be deleted).\n"
     "• /close — close the ticket.\n"
     "⚠️ Deleting a message via Telegram's own UI is NOT synced to the chat — use /del."
@@ -125,6 +126,12 @@ class TelegramOps:
                 # Hint for the operator — printed straight into the topic, does NOT go to the user's feed.
                 await self.send_to_topic(message.message_thread_id, HELP_TEXT)
                 _LOG.info("[op] /help thread=%s", message.message_thread_id)
+                return
+            if command.command == "c":
+                # Canned reply: "/c <key>" — forward the key as the command arg (the relay expands it).
+                await on_command(message.message_thread_id, f"/c {command.args or ''}".rstrip(),
+                                 operator_name(message.from_user))
+                _LOG.info("[op] /c thread=%s", message.message_thread_id)
                 return
             await on_command(message.message_thread_id, f"/{command.command}", operator_name(message.from_user))
             _LOG.info("[op] command=/%s thread=%s", command.command, message.message_thread_id)
