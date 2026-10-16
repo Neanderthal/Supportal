@@ -52,6 +52,10 @@ SUPPORT_OPENAPI: off
 # hard-erase everything stored for a user_ref (messages, attachments, tickets, Telegram topics). Default: off.
 SUPPORT_GDPR: off
 
+# Observability: expose GET /metrics in Prometheus text format (tickets/messages/attachments/outbox gauges).
+# Unauthenticated — only expose it on an internal network / scrape target. Default: off.
+SUPPORT_METRICS: off
+
 # Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
 # the ticket-closed notice is the only server-generated user-facing line — localize it here.
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.

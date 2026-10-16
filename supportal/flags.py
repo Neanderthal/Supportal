@@ -18,6 +18,7 @@ class Flags:
     RECEIPTS = "SUPPORT_RECEIPTS"
     OPENAPI = "SUPPORT_OPENAPI"       # read at startup (app.py), not hot
     GDPR = "SUPPORT_GDPR"
+    METRICS = "SUPPORT_METRICS"
 
     # Values (read with settings.get_int / get / get_dict).
     RATE_LIMIT_MAX = "SUPPORT_RATE_LIMIT_MAX"

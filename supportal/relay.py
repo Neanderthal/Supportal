@@ -123,6 +123,12 @@ class Relay:
         """Fetch a stored attachment (bytes + metadata) for serving to the browser."""
         return self._store.get_attachment(attachment_id)
 
+    def metrics(self) -> dict | None:
+        """Point-in-time counts for the /metrics endpoint (feature SUPPORT_METRICS). None when the feature is off."""
+        if not get_bool(Flags.METRICS, False):
+            return None
+        return self._store.metrics()
+
     def export_user(self, user_ref: str) -> dict | None:
         """GDPR data export (feature SUPPORT_GDPR): everything stored for a user_ref. None when the feature is off."""
         if not get_bool(Flags.GDPR, False):

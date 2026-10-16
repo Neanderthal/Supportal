@@ -4,8 +4,10 @@ from __future__ import annotations
 import hmac
 import logging
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 
+from .metrics import CONTENT_TYPE as METRICS_CONTENT_TYPE
+from .metrics import render as render_metrics
 from .models import IngressMessage, IngressResult
 from .relay import Relay, sign
 
@@ -26,6 +28,14 @@ def build_router(relay: Relay, ingress_secret: str) -> APIRouter:
     @router.get("/health", tags=["health"], summary="Health probe")
     async def health() -> dict:
         return {"status": "ok", "service": "supportal"}
+
+    @router.get("/metrics", tags=["health"], summary="Prometheus metrics (feature SUPPORT_METRICS)",
+                description="Prometheus text exposition. Off by default; expose only on an internal network.")
+    async def metrics() -> Response:
+        counts = relay.metrics()
+        if counts is None:
+            raise HTTPException(status_code=404, detail="metrics disabled")
+        return Response(content=render_metrics(counts), media_type=METRICS_CONTENT_TYPE)
 
     @router.post("/v1/messages", response_model=IngressResult, tags=["product"],
                  summary="Product → relay: a user message",
