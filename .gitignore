@@ -1,6 +1,28 @@
-.venv/
+# Python
 __pycache__/
-*.db
-.env
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtualenv / tooling caches
+.venv/
 .ruff_cache/
 .pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets & local data
+.env
+.env.*
+!.env.example
+*.db
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
