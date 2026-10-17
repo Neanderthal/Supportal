@@ -14,6 +14,24 @@
   --ds-radius: var(--radius, 0.55rem);
 }
 
+/* ── built-in color schemes (feature: cfg.theme) ─────────────────────────────────────────────
+   A product may pick one of 7 named schemes via cfg.theme instead of inheriting the host's design
+   tokens. The class sets the --ds-* tokens with literal HSL channels, which (higher specificity than
+   the base #supportal-root rule) override the host var() fallbacks. Six accent schemes keep the light
+   neutral surface and only recolor the accent; "dark" recolors the whole surface. No cfg.theme → the
+   widget keeps inheriting host tokens as before. */
+#supportal-root.supportal-theme-blue    { --ds-primary: 221 83% 53%; --ds-primary-fg: 210 40% 98%; }
+#supportal-root.supportal-theme-violet  { --ds-primary: 262 83% 58%; --ds-primary-fg: 0 0% 100%; }
+#supportal-root.supportal-theme-emerald { --ds-primary: 152 60% 36%; --ds-primary-fg: 0 0% 100%; }
+#supportal-root.supportal-theme-amber   { --ds-primary: 30 95% 44%;  --ds-primary-fg: 0 0% 100%; }
+#supportal-root.supportal-theme-rose    { --ds-primary: 346 77% 50%; --ds-primary-fg: 0 0% 100%; }
+#supportal-root.supportal-theme-teal    { --ds-primary: 184 70% 34%; --ds-primary-fg: 0 0% 100%; }
+#supportal-root.supportal-theme-dark {
+  --ds-primary: 217 91% 60%; --ds-primary-fg: 0 0% 100%;
+  --ds-card: 222 47% 11%; --ds-fg: 210 40% 98%;
+  --ds-muted: 217 33% 20%; --ds-muted-fg: 215 20% 65%; --ds-border: 217 33% 27%;
+}
+
 /* ── floating button (bottom-left by default; bottom-right via cfg.position="right") ──────────── */
 #supportal-fab {
   position: fixed; left: 20px; bottom: 20px;

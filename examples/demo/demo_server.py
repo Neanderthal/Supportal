@@ -157,7 +157,7 @@ async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
             "ttl": 900, "attachments": True, "context": True, "csat": True, "receipts": True, "sse": True,
-            "locale": DEMO_LOCALE, "position": "right"}
+            "locale": DEMO_LOCALE, "position": "right", "theme": "violet"}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────

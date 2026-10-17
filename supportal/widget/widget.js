@@ -64,6 +64,11 @@
     }
   };
 
+  // Built-in color schemes (feature: cfg.theme). Six accent palettes on the light neutral surface plus a
+  // full dark scheme; the matching .supportal-theme-* classes live in widget.css. Whitelisted so a
+  // product-supplied cfg.theme can't inject arbitrary CSS classes onto the root.
+  var THEMES = ["blue", "violet", "emerald", "amber", "rose", "teal", "dark"];
+
   var cfg = null;          // {api_base, token, ttl, strings?}
   var lastSeq = 0;         // polling cursor by seq (insert/edit/delete)
   var unread = 0;          // unread operator replies while the panel is closed
@@ -471,6 +476,10 @@
     // Launcher corner: the product may pin it bottom-right (next to the drawer) via cfg.position="right".
     // Default stays bottom-left. The launcher auto-hides while the panel is open (CSS, off the .open class).
     if (cfg && cfg.position === "right") root.classList.add("supportal-right");
+
+    // Color scheme: cfg.theme selects a built-in palette (one of THEMES) instead of inheriting host tokens.
+    // Unknown/absent → keep host tokens. We whitelist the name so cfg can't inject arbitrary classes.
+    if (cfg && THEMES.indexOf(cfg.theme) !== -1) root.classList.add("supportal-theme-" + cfg.theme);
 
     // Localized copy — set as text/attributes (never innerHTML), so product-supplied strings are inert.
     els.title.textContent = STRINGS.title;
