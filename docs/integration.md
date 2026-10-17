@@ -18,6 +18,18 @@ The widget takes its palette from the host's design tokens in the **shadcn forma
 ⚠️ **Not hex and not `hsl(...)`** — `hsl(#2563eb)` is invalid and the bubbles will "break" (become invisible).
 No tokens — the widget uses its built-in fallbacks and stays readable. Example — `examples/demo/index.html`.
 
+## Launcher placement
+The floating launcher button sits in the **bottom-left** corner by default. A product can pin it to the
+**bottom-right** (next to the slide-out drawer) with a **`position`** field in `POST /support/config`:
+
+```json
+→ 200 {"api_base":"/support-api","token":"…","ttl":900,"position":"right"}   // "left" (default) | "right"
+```
+
+The launcher **auto-hides while the panel is open** (the drawer's own × closes it), so a right-aligned
+launcher never overlaps the drawer. Any value other than `"right"` keeps the default left corner. The demo
+(`examples/demo/`) advertises `"position":"right"`.
+
 ## Localization (i18n) — built-in locale packs + overrides
 Two independent surfaces, both English by default:
 

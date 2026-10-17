@@ -1,6 +1,7 @@
 // supportal — embeddable support widget (vanilla JS, no dependencies).
 //
-// Self-contained: draws a floating "💬" button (bottom-left) + a slide-out panel on the right, keeps its own
+// Self-contained: draws a floating "💬" button (bottom-left; bottom-right via cfg.position) + a slide-out
+// panel on the right (the launcher hides while the panel is open), keeps its own
 // feed, talks DIRECTLY to the relay with a token. It embeds into a product with a single <script> tag (+ widget.css);
 // all logic is here. The source of truth of the conversation is the relay (DB); the widget only polls.
 //
@@ -466,6 +467,10 @@
     els.attach = root.querySelector(".supportal-attach");
     els.fileInput = root.querySelector(".supportal-file-input");
     els.title = root.querySelector(".supportal-drawer-title");
+
+    // Launcher corner: the product may pin it bottom-right (next to the drawer) via cfg.position="right".
+    // Default stays bottom-left. The launcher auto-hides while the panel is open (CSS, off the .open class).
+    if (cfg && cfg.position === "right") root.classList.add("supportal-right");
 
     // Localized copy — set as text/attributes (never innerHTML), so product-supplied strings are inert.
     els.title.textContent = STRINGS.title;

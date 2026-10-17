@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Widget launcher placement: a `position` field in `/support/config` (`"left"` default | `"right"`) pins the
+  floating launcher to either bottom corner, and the launcher now auto-hides while the chat panel is open
+  (so a right-aligned launcher never overlaps the drawer). The demo advertises `"position":"right"`.
 - README glow-up: an SVG project logo + a colorful ASCII terminal banner (`assets/logo.svg`,
   `assets/banner.svg`), demo screenshots of both sides of a conversation (`assets/screenshot-*.png`),
   and a reworked, more developer-oriented layout (feature table, ASCII flow diagram, copy-paste curl

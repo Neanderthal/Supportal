@@ -3,7 +3,7 @@
 Run from the repo root:
     uv run python examples/demo/demo_server.py
 then open:
-    http://localhost:8600/          — user-facing page with the chat widget (💬, bottom-left)
+    http://localhost:8600/          — user-facing page with the chat widget (💬, bottom-right; hides when open)
     http://localhost:8600/operator  — mock "Telegram topic" console to reply as the operator
 
 No real Telegram bot/supergroup is used: `TelegramOps` is replaced by an in-memory fake,
@@ -157,7 +157,7 @@ async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
             "ttl": 900, "attachments": True, "context": True, "csat": True, "receipts": True, "sse": True,
-            "locale": DEMO_LOCALE}
+            "locale": DEMO_LOCALE, "position": "right"}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────
