@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- README glow-up: an SVG project logo + a colorful ASCII terminal banner (`assets/logo.svg`,
+  `assets/banner.svg`), demo screenshots of both sides of a conversation (`assets/screenshot-*.png`),
+  and a reworked, more developer-oriented layout (feature table, ASCII flow diagram, copy-paste curl
+  examples, collapsible project tree).
 - Russian localization (`SUPPORT_LOCALE`, default `en`): a built-in `ru` locale pack. Server-generated copy
   — the closed / away notices and the operator / assistant author labels — follows the active locale
   (`supportal/i18n.py`); each notice stays overridable by its own setting (`SUPPORT_CLOSED_NOTICE` /

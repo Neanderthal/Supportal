@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="supportal logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="0.55" stop-color="#2DA8E8"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="plane" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0B1020" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- app-icon tile -->
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#bg)"/>
+  <!-- top sheen -->
+  <rect x="16" y="16" width="224" height="112" rx="56" fill="#FFFFFF" opacity="0.08"/>
+
+  <!-- chat bubble -->
+  <g filter="url(#soft)">
+    <path d="M70 62 h116 a26 26 0 0 1 26 26 v58 a26 26 0 0 1 -26 26 H108 l-30 28 v-28 h-8 a26 26 0 0 1 -26 -26 V88 a26 26 0 0 1 26 -26 z" fill="#FFFFFF"/>
+  </g>
+
+  <!-- telegram-style paper plane, centered in the bubble -->
+  <g transform="translate(86.5,70) scale(3.25)">
+    <polygon points="22 2 15 22 11 13 2 9 22 2" fill="url(#plane)"/>
+    <polyline points="22 2 11 13" fill="none" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+  </g>
+
+  <!-- relay signal dots trailing the plane -->
+  <circle cx="74" cy="150" r="5.5" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="60" cy="158" r="3.6" fill="#FFFFFF" opacity="0.6"/>
+  <circle cx="49" cy="164" r="2.4" fill="#FFFFFF" opacity="0.4"/>
+</svg>
