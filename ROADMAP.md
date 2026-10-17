@@ -30,7 +30,7 @@ maturity as an open‑source platform.
 - SQLite by default; swappable `Store` interface for Postgres.
 - Telegram long‑polling (egress‑only, no public inbound webhook). Offline unit tests, ruff‑clean, CI.
 
-## v0.2 — internationalization & a richer channel
+## v0.2 — internationalization & a richer channel — ✅ complete
 
 - [x] 🧩 **Attachments / images** both directions (`SUPPORT_ATTACHMENTS`, default off): widget upload +
       inline/render, operator photos/documents relayed, bytes in the DB. Retires the largest v1 non‑goal.
@@ -44,24 +44,24 @@ maturity as an open‑source platform.
       per `user_ref` sliding window.
 - [x] ⚙️ **OpenAPI / `/docs`** (`SUPPORT_OPENAPI`, default off) + a reference product adapter in `examples/product_adapter.py`.
 
-## v0.3 — responsiveness & operator convenience
+## v0.3 — responsiveness & operator convenience — ✅ shipped (proactive message deferred)
 
 - [x] 🧩 **SSE transport** alongside polling (lower latency; graduates a v1 non‑goal) — `SUPPORT_SSE`, default off. Contract preserved; falls back to polling.
 - [x] 🧩 **Delivery / read status** — `SUPPORT_RECEIPTS`, default off (widget delivered tick + 👀 "seen" reaction in Telegram).
       (Typing indicator deferred: operator→user typing isn't reliably available via the Bot API.)
 - [x] 🧩 **CSAT / rating** after `/close` (widget buttons → feed row / log) — `SUPPORT_CSAT`, default off.
 - [x] 🔌 **Canned responses** — on the Telegram side (`/c <key>`), no agent console — `SUPPORT_CANNED`, default off.
-- [ ] 🧩 **Proactive message** — `POST /v1/widget/push` so the product can initiate a message to a user.
+- [ ] 🧩 **Proactive message** — `POST /v1/widget/push` so the product can initiate a message to a user. *(deferred — deprioritized for now)*
 - [x] ⚙️ **Reference Postgres `Store`** (`supportal/store_pg.py`, `SUPPORT_DB_URL=postgresql://…`, `supportal[postgres]`) — same contract as SQLite; idempotent schema; live integration test.
 
-## v1.0 — platform maturity
+## v1.0 — platform maturity — 🚧 in progress (widget / E2E tests remaining)
 
 - [x] ⚙️ **Observability**: `/metrics` (Prometheus, `SUPPORT_METRICS`, default off), health endpoint, structured logs.
 - [x] ⚙️ **GDPR operations**: export / delete a user's conversation by `user_ref` (`SUPPORT_GDPR`, default off; `POST /v1/admin/export|delete`). Retention: schedule deletes from the product.
 - [ ] ⚙️ **Widget tests** (currently manual smoke) + E2E against a test supergroup in CI.
 - [x] 🧩 **Business hours / auto‑away** message — `SUPPORT_BUSINESS_HOURS`, default off (`SUPPORT_HOURS` schedule + tz).
 
-## Later / optional modules
+## Later / optional modules — 🚧 AI shipped; multi‑channel / multi‑tenant open
 
 Kept as plugins/adapters so the core stays product‑agnostic.
 
