@@ -30,13 +30,11 @@ from .telegram_ops import (
 _LOG = logging.getLogger("supportal.relay")
 
 # The responder name the user SEES in the widget — always the anonymized "Operator" / "Оператор"
-# (localized via SUPPORT_LOCALE, see i18n.py), never the operator's real username/name: attribution of a
-# specific operator stays inside the Telegram topic (it's their message). `operator` is still carried in
-# OperatorEvent/logs ("via product" model). AI auto-answers (feature SUPPORT_AI) show a distinct
-# "Assistant" / "Ассистент" label. Both are read through i18n.t() at call time so a live SUPPORT_LOCALE
-# change applies on the next message (the `*_DISPLAY` constants are kept as the English fallbacks).
-OPERATOR_DISPLAY = "Operator"
-AI_DISPLAY = "Assistant"
+# (localized via SUPPORT_LOCALE, see i18n.py; default English), never the operator's real username/name:
+# attribution of a specific operator stays inside the Telegram topic (it's their message). `operator` is
+# still carried in OperatorEvent/logs ("via product" model). AI auto-answers (feature SUPPORT_AI) show a
+# distinct "Assistant" / "Ассистент" label. Both come from i18n.t() at call time — the single source of
+# truth (`supportal/i18n.py`) — so a live SUPPORT_LOCALE change applies on the next message.
 
 
 def sign(body: bytes, secret: str) -> str:
