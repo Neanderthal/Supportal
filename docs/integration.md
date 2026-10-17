@@ -18,19 +18,26 @@ The widget takes its palette from the host's design tokens in the **shadcn forma
 ⚠️ **Not hex and not `hsl(...)`** — `hsl(#2563eb)` is invalid and the bubbles will "break" (become invisible).
 No tokens — the widget uses its built-in fallbacks and stays readable. Example — `examples/demo/index.html`.
 
-## Widget localization (i18n)
-The widget ships **English** defaults and renders them via `textContent`/`setAttribute` (never `innerHTML`).
-The product knows the user's language, so it localizes by returning an optional **`strings`** object in
-`POST /support/config`; provided keys override the defaults, the rest stay English:
+## Localization (i18n) — built-in locale packs + overrides
+Two independent surfaces, both English by default:
+
+**Server-generated copy** (the closed / away notices and the operator / assistant author labels the user
+sees) is localized by the **`SUPPORT_LOCALE`** setting — a built-in pack, `en` (default) or `ru`. It only
+changes the *defaults*; a per-string setting (`SUPPORT_CLOSED_NOTICE` / `SUPPORT_AWAY_MESSAGE`) still wins.
+An unknown locale falls back to English (fail-soft). Packs live in [`supportal/i18n.py`](../supportal/i18n.py).
+
+**Widget UI copy** renders via `textContent`/`setAttribute` (never `innerHTML`). The widget ships built-in
+`en` + `ru` tables; the product selects one with a **`locale`** field in `POST /support/config`, and may
+still override individual keys with an optional **`strings`** object (applied on top of the pack):
 
 ```json
-→ 200 {"api_base":"/support-api","token":"…","ttl":900,
-       "strings":{"title":"Soporte","greeting":"Describe tu problema…","placeholder":"Mensaje…","send":"Enviar"}}
+→ 200 {"api_base":"/support-api","token":"…","ttl":900,"locale":"ru",
+       "strings":{"title":"Служба заботы"}}        // optional per-key override on top of the "ru" pack
 ```
-Keys: `title`, `support` (launcher aria-label), `close`, `greeting`, `placeholder`, `send`, `attach`,
-`sendFail`, `uploadFail`, `uploading` (`{name}` is substituted), `csatPrompt`, `csatThanks`. The only
-**server**-generated user-facing line is the ticket-closed notice — localize it with the
-`SUPPORT_CLOSED_NOTICE` setting (operator replies come from Telegram in the operator's own language).
+String keys: `title`, `support` (launcher aria-label), `close`, `greeting`, `placeholder`, `send`, `attach`,
+`sendFail`, `uploadFail`, `uploading` (`{name}` is substituted), `csatPrompt`, `csatThanks`. A product
+serving a language the widget doesn't ship a pack for can supply the whole set via `strings`. Operator
+replies come from Telegram in the operator's own language — those are not localized.
 
 ## Visitor context (feature `SUPPORT_VISITOR_CONTEXT`, default off)
 When on, the widget sends page context with the user's message and the relay posts a **one-time**
@@ -65,7 +72,8 @@ It fires once, on first contact (topic creation) — it does not nag on every me
   a single day (`sat`) or a comma list (`mon,wed,fri`); `end < start` crosses midnight. **Required** — an empty
   or unparseable schedule is fail-open (nobody is ever "away", the feature stays inert).
 - `SUPPORT_HOURS_TZ` — IANA timezone the schedule is evaluated in (default `UTC`).
-- `SUPPORT_AWAY_MESSAGE` — the reply text (server-generated, so localize it here, like `SUPPORT_CLOSED_NOTICE`).
+- `SUPPORT_AWAY_MESSAGE` — the reply text. Server-generated, so it follows `SUPPORT_LOCALE` (a built-in
+  Russian default under `ru`); set this to override the text regardless of locale, like `SUPPORT_CLOSED_NOTICE`.
 
 No `/support/config` flag is needed (this is purely server-side); the widget renders the away message like any
 operator reply, with a muted "clock accent" style.
@@ -128,8 +136,8 @@ them. If the KB covers the question, the answer is posted into the user's feed (
 - Runs in the **background** — the user's send returns immediately; the answer arrives shortly after like a reply.
 - **Fail-soft**: empty/missing KB, missing credentials, or any API error → hand off (no auto-answer).
 - Endpoint + key are secrets → keep them in `.env` (not `settings.yaml`); the flag/model/KB-path are settings.
-- The demo ships two short Spanish KB docs (`examples/demo/kb/`) and stubs the LLM call offline with a keyword
-  matcher so it works without an API key — try asking about *horario* or *contraseña* in the widget.
+- The demo ships two short Russian KB docs (`examples/demo/kb/`) and stubs the LLM call offline with a keyword
+  matcher so it works without an API key — try asking about *часы работы* or *пароль* in the widget.
 
 ## SSE transport (feature `SUPPORT_SSE`, default off)
 Lower-latency delivery: instead of the widget polling every ~4s, it opens one long-lived `EventSource` to

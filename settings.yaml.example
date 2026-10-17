@@ -70,6 +70,9 @@ SUPPORT_AI_MODEL: deepseek-chat
 SUPPORT_AI_KB_DIR: kb
 SUPPORT_AI_KB_MAX_CHARS: 8000
 
-# Localization. The widget's UI copy is supplied by the product via /support/config ("strings");
-# the ticket-closed notice is the only server-generated user-facing line — localize it here.
+# Localization. Built-in locale pack for the server-generated copy (closed/away notices + operator/assistant
+# author labels) AND the widget UI (en|ru; the product also passes "locale" in /support/config). Default: en.
+# Unknown locale → English. A per-string setting below still overrides its own notice regardless of locale.
+SUPPORT_LOCALE: en
 # SUPPORT_CLOSED_NOTICE: This ticket was closed by the operator.
+# SUPPORT_AWAY_MESSAGE: Thanks for reaching out! We're away right now and will reply during business hours.

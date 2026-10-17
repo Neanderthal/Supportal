@@ -110,6 +110,7 @@ so a flag can be toggled **live without a restart**. Priority: `settings.yaml` �
 
 | Flag | Default | Purpose |
 |---|---|---|
+| `SUPPORT_LOCALE` | en | built-in locale pack for server copy + widget UI (`en`\|`ru`); widget also needs `"locale"` in `/support/config` |
 | `SUPPORT_RATE_LIMIT` | off | anti-spam on `POST /v1/widget/send`, per `user_ref` |
 | `SUPPORT_RATE_LIMIT_MAX` | 20 | messages allowed within the window |
 | `SUPPORT_RATE_LIMIT_WINDOW` | 60 | window length, seconds |
@@ -161,8 +162,10 @@ Your product does exactly two things (a thin adapter):
 2. **Vendor the widget bundle** (`supportal/widget/widget.{js,css}`) into your static
    assets and expose the relay at same‑origin `/support-api/v1/widget/*` via your reverse proxy.
 
-**Localization (i18n):** the widget copy is English by default; the product localizes it by returning a
-`strings` map from `/support/config` (the one server‑generated line is the `SUPPORT_CLOSED_NOTICE` setting).
+**Localization (i18n):** English by default; set `SUPPORT_LOCALE=ru` for the built‑in Russian pack — it
+localizes the server‑generated copy (closed / away notices, the operator / assistant labels) and the widget
+UI (the product passes `"locale":"ru"` in `/support/config`). The product can still override individual
+widget strings via a `strings` map, or a single notice via `SUPPORT_CLOSED_NOTICE` / `SUPPORT_AWAY_MESSAGE`.
 
 Full integration guide: [`docs/integration.md`](docs/integration.md).
 

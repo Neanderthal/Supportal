@@ -34,8 +34,9 @@
          (a mock Telegram topic) and reply — the reply reaches the widget in ~4s (polling).
          There you can also edit or recall a reply and see the change sync into the widget.</p>
       <p><strong>Attachments & i18n:</strong> use the 📎 button to send an image or file (shown both ways).
-         The widget copy here is <strong>Spanish</strong> — supplied by <code>/support/config</code> as a
-         <code>strings</code> override to demonstrate localization (English is the default).</p>
+         The widget copy here is <strong>Russian</strong> — the built-in <code>ru</code> locale pack, selected by
+         <code>"locale":"ru"</code> in <code>/support/config</code> (<code>SUPPORT_LOCALE</code>; English is the
+         default). A product can still override individual strings via a <code>strings</code> map.</p>
       <p><strong>Visitor context:</strong> on the first message the operator console shows a 🧭 block with the
          page URL/title plus custom fields this page set via <code>window.supportalContext</code> (here:
          <code>plan</code>, <code>account</code>).</p>

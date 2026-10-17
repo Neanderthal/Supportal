@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Russian localization (`SUPPORT_LOCALE`, default `en`): a built-in `ru` locale pack. Server-generated copy
+  — the closed / away notices and the operator / assistant author labels — follows the active locale
+  (`supportal/i18n.py`); each notice stays overridable by its own setting (`SUPPORT_CLOSED_NOTICE` /
+  `SUPPORT_AWAY_MESSAGE`). The widget ships built-in `en`/`ru` tables, selected by a `locale` field in
+  `/support/config` (a `strings` map still overrides individual keys). Unknown locale → English (fail-soft).
+  The demo now runs in Russian (built-in pack, Russian canned replies + KB docs).
 - Open‑source project scaffolding: MIT `LICENSE`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, `SECURITY.md`, this changelog, GitHub issue/PR templates,
   CI and Docker‑publish workflows, Dependabot, `.dockerignore`, `.editorconfig`,
@@ -27,7 +33,7 @@ All notable changes to this project are documented here. The format is based on
 - Widget i18n: UI copy is extracted into overridable strings (English defaults), localized by the
   product via a `strings` object in `POST /support/config` (applied via textContent/setAttribute, not
   innerHTML). The server-generated ticket-closed notice is now the `SUPPORT_CLOSED_NOTICE` setting.
-  The demo ships a sample (Spanish) localization.
+  The demo ships a Russian localization (now via the built-in `ru` locale pack — see above).
 - Visitor context (`SUPPORT_VISITOR_CONTEXT`, default off): the widget sends page context (URL/title/
   referrer + custom fields from `window.supportalContext`) and the relay posts a one-time "🧭 Visitor
   context" block into a new topic for the operator (capped/sanitized, display-only). The demo shows it.
@@ -41,7 +47,7 @@ All notable changes to this project are documented here. The format is based on
   topic. Schedule parsing is fail-open; the demo is rigged after-hours to show it.
 - Canned responses (`SUPPORT_CANNED`, default off): the operator types `/c <key>` in the topic to send a
   preset reply (`/c` alone lists the keys). Presets are `SUPPORT_CANNED_REPLIES` (a YAML map, or a `k=v;k=v`
-  env string); `settings.get_dict` added. Operator-side only (no widget surface); the demo ships Spanish presets.
+  env string); `settings.get_dict` added. Operator-side only (no widget surface); the demo ships Russian presets.
 - Read receipts (`SUPPORT_RECEIPTS`, default off): the widget reports what it has seen (`POST /v1/widget/read`);
   the relay marks the operator's `out` messages read and sets a 👀 reaction on each in Telegram, and the widget
   shows a `✓` delivered tick. The `messages` feed grows a `read` flag (`store.mark_read`, `TelegramOps.react`).
@@ -59,7 +65,7 @@ All notable changes to this project are documented here. The format is based on
 - AI auto-answer (`SUPPORT_AI`, default off): a minimal KB auto-answer (not RAG) — short `.md` docs from
   `SUPPORT_AI_KB_DIR` are stuffed into an OpenAI-compatible model's context (`SUPPORT_AI_API_BASE/_KEY/_MODEL`);
   it answers from them (a background 🤖 `kind:"ai"` feed row + topic note) or replies `HANDOFF` for a human
-  (`supportal/ai.py`; fail-soft). The demo ships two Spanish KB docs and stubs the LLM offline.
+  (`supportal/ai.py`; fail-soft). The demo ships two Russian KB docs and stubs the LLM offline.
 - SSE transport (`SUPPORT_SSE`, default off): `GET /v1/widget/stream` pushes the same `WidgetPoll` payloads over
   Server-Sent Events (one long-lived connection, `SUPPORT_SSE_INTERVAL` server-side detection) → lower latency
   than polling. The widget uses `EventSource` (token via query) when `sse:true` and falls back to polling. Contract preserved.

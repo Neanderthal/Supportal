@@ -42,7 +42,7 @@
       const i = document.getElementById("in-" + id);
       const t = (i.value || "").trim(); if (!t) return;
       i.value = "";
-      // A "/..." line is an operator command (e.g. "/c saludo" — a canned reply), not a plain message.
+      // A "/..." line is an operator command (e.g. "/c привет" — a canned reply), not a plain message.
       if (t[0] === "/") await api("/op/api/command", { thread_id: id, command: t });
       else await api("/op/api/reply", { thread_id: id, text: t });
       render();
@@ -91,7 +91,7 @@
                 : ""
             }</div>`).join("")}</div>
           <div class="row">
-            <input type="text" id="in-${t.thread_id}" placeholder="Reply… (or /c saludo · /c horario · /c to list)"
+            <input type="text" id="in-${t.thread_id}" placeholder="Reply… (or /c привет · /c график · /c to list)"
                    onkeydown="if(event.key==='Enter')reply(${t.thread_id})">
             <button onclick="reply(${t.thread_id})">Send</button>
             <input type="file" id="file-${t.thread_id}" style="display:none" onchange="sendFile(${t.thread_id}, this)">

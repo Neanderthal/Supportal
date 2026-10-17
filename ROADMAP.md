@@ -36,6 +36,8 @@ maturity as an open‑source platform.
       inline/render, operator photos/documents relayed, bytes in the DB. Retires the largest v1 non‑goal.
 - [x] 🧩 **Widget i18n** — UI copy extracted into overridable strings (English default), localized by the
       product via a `strings` object in `/support/config`.
+- [x] 🧩 **Russian locale pack** (`SUPPORT_LOCALE=ru`, default `en`) — built-in `ru` for the widget UI *and*
+      the server notices / author labels (`supportal/i18n.py`); per-string settings still override.
 - [x] 🧩 **Visitor context into the topic header** (`SUPPORT_VISITOR_CONTEXT`, default off) — page URL /
       title / custom fields posted once into the topic for the operator.
 - [x] 🧩 **Rate limiting / basic anti‑spam** on `POST /v1/widget/send` (`SUPPORT_RATE_LIMIT`, default off),

@@ -12,7 +12,7 @@ import logging
 import time
 from collections import defaultdict
 
-from . import ai
+from . import ai, i18n
 from .flags import Flags
 from .hours import is_within
 from .models import IngressMessage, IngressResult, OperatorEvent
@@ -29,12 +29,13 @@ from .telegram_ops import (
 
 _LOG = logging.getLogger("supportal.relay")
 
-# The responder name the user SEES in the widget — always the anonymized "Operator" (the operator's real
-# username/name does NOT go to the feed/browser; attribution of a specific operator stays inside the
-# Telegram topic — it's their message). `operator` is still carried in OperatorEvent/logs ("via product" model).
+# The responder name the user SEES in the widget — always the anonymized "Operator" / "Оператор"
+# (localized via SUPPORT_LOCALE, see i18n.py), never the operator's real username/name: attribution of a
+# specific operator stays inside the Telegram topic (it's their message). `operator` is still carried in
+# OperatorEvent/logs ("via product" model). AI auto-answers (feature SUPPORT_AI) show a distinct
+# "Assistant" / "Ассистент" label. Both are read through i18n.t() at call time so a live SUPPORT_LOCALE
+# change applies on the next message (the `*_DISPLAY` constants are kept as the English fallbacks).
 OPERATOR_DISPLAY = "Operator"
-
-# Author shown for AI auto-answers (feature SUPPORT_AI) — distinct from a human "Operator".
 AI_DISPLAY = "Assistant"
 
 
@@ -119,7 +120,7 @@ class Relay:
         answer = await ai.auto_answer(question)
         if not answer:
             return
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", AI_DISPLAY, answer, kind="ai")
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", i18n.t("assistant"), answer, kind="ai")
         if ticket.thread_id is not None:
             try:
                 await self._tg.send_to_topic(ticket.thread_id, f"🤖 (auto-answer) {answer}")
@@ -135,15 +136,14 @@ class Relay:
             return
         if is_within(get(Flags.HOURS, ""), get(Flags.HOURS_TZ, "UTC")):
             return
-        away = get(Flags.AWAY_MESSAGE,
-                   "Thanks for reaching out! We're away right now and will reply during business hours.")
+        away = get(Flags.AWAY_MESSAGE, i18n.t("away_message"))
         if ticket.thread_id is not None:
             try:
                 await self._tg.send_to_topic(ticket.thread_id, f"⏰ (auto-away) {away}")
             except Exception:
                 _LOG.warning("[away] failed to post auto-away note into topic thread=%s", ticket.thread_id,
                              exc_info=True)
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, away, kind="away")
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", i18n.t("operator"), away, kind="away")
         _LOG.info("[away] out-of-hours auto-reply sent ticket=%s", ticket.ticket_id)
 
     async def add_user_attachment(self, user_ref: str, display_name: str, data: bytes, filename: str,
@@ -271,7 +271,7 @@ class Relay:
         if not ticket:
             _LOG.warning("[reply] reply in an unknown topic thread=%s — skipping", thread_id)
             return
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, text,
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", i18n.t("operator"), text,
                                 tg_message_id=tg_message_id)
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
                                            ticket_id=ticket.ticket_id, text=text, operator=operator))
@@ -288,7 +288,7 @@ class Relay:
             _LOG.warning("[media] media in an unknown topic thread=%s — skipping", thread_id)
             return
         att_id = self._store.add_attachment(ticket.user_ref, "out", filename, mime, data)
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, caption,
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", i18n.t("operator"), caption,
                                 tg_message_id=tg_message_id, attachment_id=att_id)
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref, ticket_id=ticket.ticket_id,
                                            text=caption or f"📎 {filename}", operator=operator))
@@ -317,10 +317,10 @@ class Relay:
             return
         if command == "/close":
             self._store.close(ticket.ticket_id)
-            notice = get(Flags.CLOSED_NOTICE, "This ticket was closed by the operator.")
+            notice = get(Flags.CLOSED_NOTICE, i18n.t("closed_notice"))
             # Feature SUPPORT_CSAT: tag the close notice so the widget renders a rating prompt below it.
             kind = "csat_request" if get_bool(Flags.CSAT, False) else "msg"
-            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, notice, kind=kind)
+            self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", i18n.t("operator"), notice, kind=kind)
             await self._dispatch(OperatorEvent(event="ticket_closed", user_ref=ticket.user_ref,
                                                ticket_id=ticket.ticket_id, operator=operator))
         elif command == "/clear":
@@ -352,7 +352,7 @@ class Relay:
             _LOG.info("[canned] ticket=%s unknown/empty key=%r — listed %d keys", ticket.ticket_id, key, len(replies))
             return
         text = replies[key]
-        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", OPERATOR_DISPLAY, text)
+        self._store.add_message(ticket.ticket_id, ticket.user_ref, "out", i18n.t("operator"), text)
         if ticket.thread_id is not None:
             await self._tg.send_to_topic(ticket.thread_id, f"↩️ (canned: {key}) {text}")
         await self._dispatch(OperatorEvent(event="message", user_ref=ticket.user_ref,
