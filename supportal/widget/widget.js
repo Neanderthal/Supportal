@@ -23,9 +23,10 @@
   var CONFIG_URL = "/support/config";          // same-origin product endpoint (returns the token)
   var POLL_VISIBLE = 4000, POLL_HIDDEN = 20000;
 
-  // UI copy — English defaults. The product may localize by returning a `strings` object in
-  // /support/config (it knows the user's language); provided keys override these (i18n).
-  // Applied via textContent/setAttribute (never innerHTML) so product-supplied copy can't inject HTML.
+  // UI copy — English defaults (also the "en" locale). Localization is layered:
+  //   1. a built-in locale pack (LOCALES below) is applied when /support/config returns `locale` (e.g. "ru");
+  //   2. a product `strings` object in /support/config then overrides individual keys (it knows the user).
+  // Everything is applied via textContent/setAttribute (never innerHTML) so supplied copy can't inject HTML.
   var STRINGS = {
     title: "Support",
     support: "Support",                     // launcher (fab) aria-label
@@ -40,6 +41,26 @@
     uploading: "📤 Uploading {name}…",
     csatPrompt: "How would you rate this conversation?",
     csatThanks: "Thanks for your feedback!"
+  };
+
+  // Built-in locale packs (beyond the English defaults above). Selected by cfg.locale; a product can still
+  // override any individual key via cfg.strings. Keys mirror STRINGS; a missing key keeps the English default.
+  var LOCALES = {
+    ru: {
+      title: "Поддержка",
+      support: "Поддержка",
+      close: "Закрыть",
+      greeting: "Опишите ваш вопрос — оператор поддержки ответит здесь."
+        + " Ответ придёт сюда, ждать на странице не нужно.",
+      placeholder: "Сообщение…",
+      send: "Отправить",
+      attach: "Прикрепить файл",
+      sendFail: "⚠️ Не удалось отправить сообщение. Попробуйте ещё раз.",
+      uploadFail: "⚠️ Не удалось загрузить файл.",
+      uploading: "📤 Загрузка {name}…",
+      csatPrompt: "Как вы оцениваете этот разговор?",
+      csatThanks: "Спасибо за ваш отзыв!"
+    }
   };
 
   var cfg = null;          // {api_base, token, ttl, strings?}
@@ -474,7 +495,9 @@
     fetchConfig().then(function (j) {
       if (!j) { setTimeout(start, 30000); return; }  // not logged in / disabled → quietly retry later
       cfg = j;
-      if (cfg.strings && typeof cfg.strings === "object") {   // product-supplied localization (i18n)
+      var pack = cfg.locale && LOCALES[cfg.locale];        // built-in locale pack (e.g. "ru"), applied first
+      if (pack) { for (var lk in STRINGS) { if (typeof pack[lk] === "string") STRINGS[lk] = pack[lk]; } }
+      if (cfg.strings && typeof cfg.strings === "object") {   // product-supplied override on top (i18n)
         for (var k in STRINGS) { if (typeof cfg.strings[k] === "string") STRINGS[k] = cfg.strings[k]; }
       }
       build();

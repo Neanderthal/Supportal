@@ -23,6 +23,7 @@ class Flags:
     SSE = "SUPPORT_SSE"               # push feed changes over Server-Sent Events (lower latency than polling)
 
     # Values (read with settings.get_int / get / get_dict).
+    LOCALE = "SUPPORT_LOCALE"               # built-in locale pack for server-generated copy (en|ru); default en
     AI_MODEL = "SUPPORT_AI_MODEL"           # OpenAI-compatible chat model (e.g. deepseek-chat)
     AI_KB_DIR = "SUPPORT_AI_KB_DIR"         # directory of short .md knowledge-base docs
     AI_KB_MAX_CHARS = "SUPPORT_AI_KB_MAX_CHARS"   # cap on the KB text stuffed into the prompt

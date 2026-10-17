@@ -28,6 +28,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 # The demo turns on the optional features it showcases (read live via settings).
+# Localization: select the built-in Russian locale pack (feature SUPPORT_LOCALE, default "en"). This makes
+# the server-generated notices (ticket-closed, auto-away) Russian; the widget is set to "ru" via /support/config.
+os.environ.setdefault("SUPPORT_LOCALE", "ru")
 os.environ.setdefault("SUPPORT_ATTACHMENTS", "on")
 os.environ.setdefault("SUPPORT_VISITOR_CONTEXT", "on")
 os.environ.setdefault("SUPPORT_CSAT", "on")
@@ -40,12 +43,11 @@ _wd = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][_utcnow.weekday()]
 os.environ.setdefault("SUPPORT_BUSINESS_HOURS", "on")
 os.environ.setdefault("SUPPORT_HOURS_TZ", "UTC")
 os.environ.setdefault("SUPPORT_HOURS", f"{_wd} {(_utcnow + timedelta(hours=2)):%H:%M}-{(_utcnow + timedelta(hours=3)):%H:%M}")
-os.environ.setdefault("SUPPORT_AWAY_MESSAGE",
-                      "¡Gracias por escribirnos! Ahora estamos fuera de horario; te responderemos en horario laboral.")
-# Canned responses: a couple of Spanish presets — in the operator console, type "/c saludo" or "/c horario".
+# No SUPPORT_AWAY_MESSAGE override → the out-of-hours reply uses the Russian locale default (see i18n.py).
+# Canned responses: a couple of Russian presets — in the operator console, type "/c привет" or "/c график".
 os.environ.setdefault("SUPPORT_CANNED", "on")
 os.environ.setdefault("SUPPORT_CANNED_REPLIES",
-                      "saludo=¡Hola! ¿En qué puedo ayudarte?;horario=Atendemos de lunes a viernes, 9:00–18:00.")
+                      "привет=Здравствуйте! Чем могу помочь?;график=Мы работаем пн–пт, с 9:00 до 18:00.")
 os.environ.setdefault("SUPPORT_RECEIPTS", "on")   # read receipts: ✓ delivered + the operator console shows "seen"
 os.environ.setdefault("SUPPORT_GDPR", "on")       # GDPR export/erase buttons on the user page
 os.environ.setdefault("SUPPORT_METRICS", "on")    # GET /metrics (Prometheus) reflects the demo's data
@@ -60,12 +62,12 @@ import supportal.ai as _ai  # noqa: E402
 
 
 async def _fake_auto_answer(question: str):
-    """Offline stand-in for the LLM: return the KB doc whose title words overlap the question, else hand off."""
+    """Offline stand-in for the LLM: return the KB doc whose trigger words overlap the question, else hand off."""
     kb_dir = os.environ.get("SUPPORT_AI_KB_DIR", "kb")
     import glob
     q = (question or "").lower()
-    hints = {"horarios.md": ("horario", "hora", "abren", "atienden", "atención"),
-             "contrasena.md": ("contraseña", "contrasena", "password", "acceso", "entrar", "olvid")}
+    hints = {"hours.md": ("час", "время", "график", "работа", "когда", "выходн"),
+             "password.md": ("парол", "пароль", "вход", "войти", "доступ", "забыл", "сброс")}
     for path in sorted(glob.glob(os.path.join(kb_dir, "*.md"))):
         name = os.path.basename(path)
         if any(w in q for w in hints.get(name, ())):
@@ -89,16 +91,10 @@ from supportal.widget_api import build_widget_router  # noqa: E402
 
 DEMO_SECRET = "demo-widget-secret"      # shared by /support/config (mint) and the widget API (verify)
 DEMO_USER = "demo@local"                # in production this is the logged-in user's normalized id
-# Sample product-supplied localization (Spanish) — demonstrates widget i18n via /support/config.
-DEMO_STRINGS = {
-    "title": "Soporte",
-    "greeting": "Describe tu consulta — un operador responderá aquí; no hace falta esperar en la página.",
-    "placeholder": "Mensaje…",
-    "send": "Enviar",
-    "attach": "Adjuntar un archivo",
-    "csatPrompt": "¿Cómo valorarías esta conversación?",
-    "csatThanks": "¡Gracias por tu opinión!",
-}
+DEMO_LOCALE = os.environ.get("SUPPORT_LOCALE", "ru")   # widget locale advertised to the browser (built-in "ru" pack)
+# A product MAY still override individual UI strings on top of the built-in locale, e.g.
+#   DEMO_STRINGS = {"title": "Служба заботы"}
+# and pass `"strings": DEMO_STRINGS` in /support/config. The demo relies on the built-in "ru" pack, no override.
 HERE = Path(__file__).resolve().parent
 WIDGET_DIR = _REPO_ROOT / "supportal" / "widget"
 
@@ -161,7 +157,7 @@ async def support_config() -> dict:
     """Product side: mint a short-lived widget token for the logged-in user (here: DEMO_USER)."""
     return {"api_base": "/support-api", "token": mint_widget_token(DEMO_USER, DEMO_SECRET, ttl=900),
             "ttl": 900, "attachments": True, "context": True, "csat": True, "receipts": True, "sse": True,
-            "strings": DEMO_STRINGS}
+            "locale": DEMO_LOCALE}
 
 
 # ── mock operator console (stands in for the Telegram forum topic) ──────────────────────
@@ -259,7 +255,7 @@ async def op_close(body: CloseIn) -> dict:
 
 class CommandIn(BaseModel):
     thread_id: int
-    command: str        # e.g. "/c saludo" (canned reply) or "/c" (list) — stands in for typing it in the topic
+    command: str        # e.g. "/c привет" (canned reply) or "/c" (list) — stands in for typing it in the topic
 
 
 @app.post("/op/api/command")
