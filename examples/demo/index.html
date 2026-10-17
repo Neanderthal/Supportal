@@ -7,9 +7,11 @@
   <link rel="stylesheet" href="/static/widget.css">
   <style>
     /* The widget uses the host's design tokens in shadcn style — HSL CHANNELS "H S% L%" (NOT hex!),
-       because internally it wraps them in hsl(var(--primary)). Hex here would break hsl() → invisible bubbles. */
+       because internally it wraps them in hsl(var(--primary)). Hex here would break hsl() → invisible bubbles.
+       NOTE: this demo's /support/config advertises "theme":"violet", a built-in color scheme that OVERRIDES
+       these host tokens. Drop the "theme" field in demo_server.py to see the widget inherit the blue below. */
     :root {
-      --primary: 221 83% 53%;              /* blue brand color: user bubbles + button/FAB */
+      --primary: 221 83% 53%;              /* blue brand color (overridden by the violet scheme in this demo) */
       --primary-foreground: 210 40% 98%;   /* text on --primary */
     }
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; color: #111; background: #f6f7f9; }

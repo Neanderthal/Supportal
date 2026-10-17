@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Widget color schemes: a `theme` field in `/support/config` selects one of 7 built-in palettes —
+  `blue`, `violet`, `emerald`, `amber`, `rose`, `teal` (accent on a light surface) and `dark` (full dark
+  surface). A scheme overrides the host's design tokens (sets the widget's `--ds-*` variables); omitting
+  `theme` keeps inheriting host tokens, and an unknown value is ignored. The demo advertises `"theme":"violet"`.
 - Widget launcher placement: a `position` field in `/support/config` (`"left"` default | `"right"`) pins the
   floating launcher to either bottom corner, and the launcher now auto-hides while the chat panel is open
   (so a right-aligned launcher never overlaps the drawer). The demo advertises `"position":"right"`.

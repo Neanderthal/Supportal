@@ -18,6 +18,19 @@ The widget takes its palette from the host's design tokens in the **shadcn forma
 ⚠️ **Not hex and not `hsl(...)`** — `hsl(#2563eb)` is invalid and the bubbles will "break" (become invisible).
 No tokens — the widget uses its built-in fallbacks and stays readable. Example — `examples/demo/index.html`.
 
+### Built-in color schemes
+Instead of (or on top of) inheriting host tokens, a product can pick one of **7 built-in color schemes** with a
+**`theme`** field in `POST /support/config`:
+
+```json
+→ 200 {"api_base":"/support-api","token":"…","ttl":900,"theme":"violet"}
+```
+
+Values: **`blue`**, **`violet`**, **`emerald`**, **`amber`**, **`rose`**, **`teal`** (six accent palettes on the
+light neutral surface) and **`dark`** (a full dark surface). A selected scheme **overrides the host's design
+tokens** (it sets the widget's internal `--ds-*` variables directly); omit `theme` to keep inheriting host tokens.
+An unknown value is ignored (falls back to host tokens). The demo (`examples/demo/`) advertises `"theme":"violet"`.
+
 ## Launcher placement
 The floating launcher button sits in the **bottom-left** corner by default. A product can pin it to the
 **bottom-right** (next to the slide-out drawer) with a **`position`** field in `POST /support/config`:
